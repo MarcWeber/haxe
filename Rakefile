@@ -13,67 +13,89 @@
 # ==================
 ACTIVE_BACKENDS = %w{neko}
 # additional flags:
-CFLAGS = ""
+CFLAGS = "-annot"
 CFLAGS_BACKEND = []
+
+INCLUDES=%w{libs/extlib libs/extc libs/neko libs/javalib libs/ziplib libs/swflib libs/xml-light libs/ttflib}
 
 # utils {{{1
 # ==========
+
+
+module Rake
+  class Task
+    def multi
+      self.instance_eval {
+        def invoke_prerequisites(a,b)
+          invoke_prerequisites_concurrently(a,b)
+        end
+      }
+    end
+  end
+end
+
 def system_raise(cmd)
   system(cmd)
   raise "#{cmd} failed" if $? != 0
 end
 
+$deps_hash = Hash.new
+class Ml
+  include Rake::DSL
 
-class Ocamlopt
-  attr_reader :includes, :preprocessors, :compiler
-  attr_writer :compiler
+  attr_accessor :extra_flags
+  attr_reader :cmx_deps_no_ext
 
-  def initialize()
-    # $CFLAGS="#{CFLAGS} -pp camlp4o -g #{$OCAML_INCLUDES}"
-    @compiler = "ocamlopt"
+  def initialize(name, cmx_deps_no_ext)
+    @name = name
+    @cmx_deps_no_ext = cmx_deps_no_ext
     @includes = %w{libs/extlib libs/extc libs/neko libs/javalib libs/ziplib libs/swflib libs/xml-light libs/ttflib}
-    @preprocessors = []
+    $deps_hash[@name] = self
   end
 
-  def compile_cmd(source)
-    includes = @includes.map {|v| "-I #{v}"}.join(" ")
-    preprocessors = @preprocessors.join(' ')
-    cflags_backend = "-pp \"cppo #{CFLAGS_BACKEND.join(' ')}\""
-    "#{@compiler} #{cflags_backend} #{$ml_extra_flags[source]} #{preprocessors} #{CFLAGS} #{includes} -c #{source}"
+  def derive
+  end
+
+  def cppo
+    @cflags_backend = "-pp \"cppo #{CFLAGS_BACKEND.join(' ')}\""
+  end
+
+  def cmx_dependencies
+    cmx_deps_no_ext.map {|v| "#{v}.cmx"}
+  end
+
+  def compile_cmd
+    includes = INCLUDES.map {|v| "-I #{v}"}.join(" ")
+    "ocamlopt #{@cflags_backend} #{@extra_flags} #{CFLAGS} #{includes} -c #{@name}.ml"
+  end
+
+  def create_rake_task()
+    file "#{@name}.cmx" => ["#{@name}.ml"] + cmx_dependencies do
+      sh compile_cmd
+    end.multi
   end
 end
-
-# use drake instead of rake?
-class MultiFile < Rake::FileTask
-  private
-  def invoke_prerequisites(task_args, invocation_chain) # :nodoc:
-    invoke_prerequisites_concurrently(task_args, invocation_chain)
-  end
-end
-
-def multifile(*args, &block)
-    MultiFile.define_task(*args, &block)
-end
-
-$ocamlopt = Ocamlopt.new
 
 # implementation start {{{1
 # =====================
 
 # getting ml file dependencies from official Makefile - yes this sucks - but is likely to work:
 
-deps_hash = Hash.new
 File.open("Makefile","r").lines.each {|line|
   case line
   when /([^.]*)\.cmx: (.*)/
-    deps_hash[$1] = $2.split(" ").map {|v| v.gsub(/.cmx$/, '')}
+    name = $1
+    deps = $2.split(" ").map {|v| v.gsub(/.cmx$/, '')}
+    $deps_hash[name] = Ml.new(name, deps)
   end
 }
 
-deps_hash["ast"] = []
+$deps_hash["ast"] = Ml.new("ast", [])
 
-$ml_extra_flags = Hash.new
-$ml_extra_flags["parser.ml"] = "-pp camlp4o"
+$deps_hash["parser"] = Ml.new("parser", %w{lexer common ast})
+$deps_hash["parser"].extra_flags = "-pp camlp4o"
+
+%w{interp main typer}.each {|v| $deps_hash[v].cppo }
 
 backend_files = Hash.new
 backend_files[:swf] = %w{genswf8 genswf9 genswf}
@@ -113,13 +135,6 @@ Lib.new(:swflib, %w{swflib.cmxa})
 Lib.new("xml-light".to_sym, %w{xml-light.cmxa}).add_make_args("xml-light.cmxa")
 Lib.new(:ttflib, %w{ttf.cmxa}).add_lib_dependencies(:swflib, :extc)
 
-# drop non local files
-local_ml_files = Dir["*.ml"]
-deps_hash.each_pair do |k,v|
-  v.select! {|file| local_ml_files.include? "#{file}.ml" }
-end
-
-
 ACTIVE_BACKENDS.map! {|v| v.to_sym}
 
 # drop unused files:
@@ -128,14 +143,14 @@ backend_files.each_pair do |k,v|
     CFLAGS_BACKEND << "-D BACKEND_#{k}"
   else
     v.each do |file_to_delete|
-      deps_hash.delete file_to_delete
-      deps_hash.each_pair {|k,v| v.select! {|file| file != file_to_delete }}
+      $deps_hash.delete file_to_delete
+      $deps_hash.each_pair {|k,ml| ml.cmx_deps_no_ext.select! {|file| file != file_to_delete }}
     end
   end
 end
 
 deps = []
-deps_hash.each_pair {|k,v| v.each {|dep| deps << k; deps << dep } }
+$deps_hash.each_pair {|k,ml| ml.cmx_deps_no_ext.each {|dep| deps << k; deps << dep } }
 require 'rgl/adjacency'
 dg = RGL::DirectedAdjacencyGraph.__send__(:[], *deps )
 
@@ -216,13 +231,13 @@ lib_dependencies = $libs.each_pair {|k,v| v.targets}.flatten(1)
 
 $libs.each_pair do|path, lib|
 
-  multifile lib.main_target => ["libs"] + lib.prerequisites do
+  file lib.main_target => ["libs"] + lib.prerequisites do
     make_args = lib.make_args.map {|v| " #{v}"}.join('')
     sh "make -C libs/#{path}#{make_args}"
-  end
+  end.multi
   # for each alternative target create a new task:
   lib.targets.drop(1).each do |t|
-    multifile "libs/#{path}/#{t}" => lib.main_target
+    (file "libs/#{path}/#{t}" => lib.main_target).multi
   end
 
   multitask :compile_libs => lib.main_target
@@ -239,11 +254,8 @@ end
 
 # define rake tasks for building haxe, one task for each file
 # When changing the setup things may break ..
-deps_hash.each_pair {|k,v|
-  file "#{k}.cmx" => ["#{k}.ml"] +v.map {|v| "#{v}.cmx"} do
-    sh $ocamlopt.compile_cmd("#{k}.ml")
-    # ocamlopt -annot -g -I libs/extlib -I libs/extc -I libs/neko -I libs/javalib -I libs/ziplib -I libs/swflib -I libs/xml-light -I libs/ttflib -c interp.ml
-  end
+$deps_hash.each_pair {|k,ml|
+  ml.create_rake_task
 }
 
 haxe_local_deps = []
@@ -253,7 +265,7 @@ dg.depth_first_visit("main") {|n|
 }
 haxe_local_deps
 
-multifile "haxe" => ["libs/"] + haxe_local_deps do
+file "haxe" => ["libs/"] + haxe_local_deps do
   # TODO
   libs = []
   libs << "-cclib"
@@ -271,7 +283,7 @@ multifile "haxe" => ["libs/"] + haxe_local_deps do
   libs << "libs/ziplib/zip.cmxa"
   libs << "libs/ttflib/ttf.cmxa"
   sh "ocamlopt #{libs.join(' ')} -o haxe #{haxe_local_deps.join(' ')}"
-end
+end.multi
 
 task :default => []  do
   puts "default task: do nothing"
