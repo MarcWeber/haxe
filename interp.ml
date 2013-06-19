@@ -2328,9 +2328,9 @@ let macro_lib =
 				);
 				VNull
 #else
-                                raise FeatureDependsOnDisabledPlatform
+                                raise (FeatureDependsOnDisabledPlatform "custom_js")
 #endif
-			| _ -> error()
+			| _ -> (error() : value)
 		);
 		"get_pos_infos", Fun1 (fun p ->
 			match p with
@@ -2406,8 +2406,11 @@ let macro_lib =
 			| VString file ->
 				let com = ccom() in
 				(match com.platform with
+                               | Flash ->
 #ifdef BACKEND_flash
-				| Flash -> Genswf.add_swf_lib com file false
+                                            Genswf.add_swf_lib com file false
+#else
+                                            (raise (FeatureDependsOnDisabledPlatform "add_native_lib") : unit)
 #endif
 				| _ -> failwith "Unsupported platform");
 				VNull
