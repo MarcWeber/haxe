@@ -1,0 +1,17 @@
+From: Marc Weber <marco-oweber@gmx.de>
+Subject: [PATCH] t/rake-conditional-compilation
+
+Allow building some targets only, eg "neko".
+If the user tries to use a platform he didn't compile he'll get a nice message
+
+Conditional compilation requires cppo (which is much faster and simpler than camlp4)
+
+RAKE
+====
+implement a new build system based on rake.
+The Rakefile documents library dependencies.
+
+TODO: 
+- make ./*.ml files depend on libs/* directly rather than assuming the user
+  compiles libs first
+- don't hardcode libraries
