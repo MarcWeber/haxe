@@ -12,6 +12,9 @@
 #
 # * ./*.ml depending on libraries - this dependenc information can still be incomplete
 #   If you find a problem, fix it :)
+#
+# Now that generating makefiles is supported I could have used haxe ? what
+# about rgl depth_first_visit implementation?
 
 # CONFIGURATION: {{{1
 # ==================
@@ -27,8 +30,8 @@ ACTIVE_BACKENDS = ALL_BACKENDS
 # additional flags:
 ANNOT = "-dtypes" # "-dtypes" or "-annot" or ""
 
-DERIVING_PATH="deriving"
-DERIVING_SUPPORT = true
+DERIVING_PATH = "deriving"
+DERIVING_SUPPORT = false
 
 CPPO_PATH="cppo/cppo"
 
@@ -42,6 +45,7 @@ ACTIVE_FLAVOURS = FLAVOURS
 # ==========
 INCLUDES=%w{libs/extlib libs/extc libs/neko libs/javalib libs/ziplib libs/swflib libs/xml-light libs/ttflib}
 CFLAGS_BACKEND = []
+EXTS_TO_CLEAN = ["*.cmx", "*.cmi", "*.cmo", "*.cma", "*.cmxa", "*.annot", "*.o","*.a"]
 
 class String
   # bad style
@@ -81,6 +85,86 @@ class Hash
   end
 end
 
+$tasks = []
+
+# provides makefile implementation for My_FileTask My_Task
+class My_MakeFileTask
+  def makefile(out)
+    hash = case @hash
+    when Hash; @hash
+    when String; { @hash => [] }
+    end
+    raise "unexpected" if hash.keys.length > 1
+    hash.each_pair {|k,v|
+      out.write(<<-EOF)
+#{k.ocaml_native(@native)}: #{v.ocaml_native(@native).join(' ')}
+#{@cmds.map {|v| "\t#{v}"}.join("\n")}
+      EOF
+    }
+  end
+end
+
+# a File task. target is a file or directory
+class My_FileTask < My_MakeFileTask
+  include Rake::DSL
+
+  # hash is target => deps
+  def initialize(native, hash, cmds)
+    @native = native
+    @hash = hash
+    @cmds = cmds
+    $tasks << self
+  end
+
+  def rake_task
+    my_multifile @native, @hash do
+      @cmds.each {|v| sh v}
+    end
+  end
+
+end
+
+# a "phony" task, target file/dir will not exist (used for aliasing task names)
+class My_Task < My_MakeFileTask
+  include Rake::DSL
+
+  def initialize(hash, cmds)
+    @hash = hash
+    @cmds = cmds
+    $tasks << self
+  end
+
+  def rake_task
+    my_multitask @hash do
+      @cmds.each {|v| sh v}
+    end
+  end
+
+end
+
+class My_CleanTask
+  include Rake::DSL
+
+  def initialize(name, dir, files = [])
+    @name = name
+    @files = files
+    @dir = dir
+    $tasks << self
+  end
+
+  def rake_task
+    task @name do
+      clean_dir @dir
+      # TODO clean files
+    end
+  end
+
+  def makefile(out)
+    out.write("#{@name}:\n")
+    out.write("\tcd #{@dir}; rm #{EXTS_TO_CLEAN.join(' ')} #{@files.join(' ')}\n")
+  end
+end
+
 # module Rake
 #   class Task
 #     def multi
@@ -117,9 +201,8 @@ def my_multifile(native, hash = {}, *args, &block)
     MultiFile.define_task(hash.ocaml_native(native), *args, &block)
 end
 
-def my_multitask(native, hash = {}, *args, &block)
-    native.assert_ocaml_native()
-    multitask(hash.ocaml_native(native), *args, &block)
+def my_multitask(hash = {}, *args, &block)
+    multitask(hash, *args, &block)
 end
 
 def system_raise(cmd)
@@ -129,8 +212,6 @@ end
 
 $deps_hash = Hash.new
 class Ml
-  include Rake::DSL
-
   attr_accessor :extra_flags, :cmx_deps_no_ext
 
   def initialize(name, cmx_deps_no_ext)
@@ -178,12 +259,9 @@ class Ml
     "OCAML #{DEBUGGING_SUPPORT} #{ANNOT} #{@cflags_backend} #{@deriving} #{@extra_flags} #{includes} #{@extra_deps} -c #{@name}.ml".ocaml_native(native)
   end
 
-  def create_rake_task(native)
+  def tasks(native)
     lib_deps = @depends_on_libraries.map {|v| $libs[v].main_target }
-
-    my_multifile(native, "#{@name}.CEXT" => ["#{@name}.ml"] + cmx_dependencies + lib_deps + @other_deps) do
-      sh compile_cmd(native)
-    end
+    My_FileTask.new(native, {"#{@name}.CEXT" => (["#{@name}.ml"] + cmx_dependencies + lib_deps + @other_deps)}, [compile_cmd(native)])
   end
 end
 
@@ -193,7 +271,6 @@ end
 
 $repositories = Hash.new
 class Repository
-  include Rake::DSL
 
   # Repository.new("lib", {:type => :git, :url => ... }
   def initialize(path, repo, depends_on_targets = [])
@@ -212,48 +289,55 @@ class Repository
     self
   end
 
+  def main_target
+    @extra_targets[][:files][0]
+  end
+
   def clean_command(cmd)
     @clean_command = cmd
     self
   end
 
-  def create_rake_task(native)
+  def tasks(native)
     # check out
-    my_multifile(native, "#{@path}") do
-      case @repo[:type]
+    cmds = []
+    case @repo[:type]
+      when :tar_gz
+        cmds << "curl '#{@repo[:url]}' | tar xzf -"
+        cmds << "mv #{@repo[:rename][0]} #{@repo[:rename][1]}" if @repo[:rename]
       when :git
-        sh "git clone #{@repo[:url]} #{@path}"
+        cmds << "git clone #{@repo[:url]} #{@path}"
       else raise "not implemented #{@repo[:type]}"
       end
-    end
+    My_FileTask.new(native, "#{@path}", cmds)
+
     # compile etc
     @extra_targets.each {|v|
-      my_multifile native, "#{v[:files][0]}" => ["#{@path}"] + v[:depends_on_targets] do
-        sh v[:cmd].ocaml_native(native)
-      end
+      My_FileTask.new(native, { "#{v[:files][0]}" => ["#{@path}"] + v[:depends_on_targets] }, v[:cmd].ocaml_native(native))
 
       v[:files].drop(1).each {|file|
         # alias targets
-        my_multifile(native,  file => v[:files][0]) do
-        end
+        My_FileTask.new .call(native, { file => v[:files][0] }, [])
       }
     }
     if @clean_command
-      task "clean_#{@path}" do
-        sh @clean_command
-      end
+      My_FileTask.new(native, "clean_#{@path}", @clean_command)
     end
   end
 end
 Repository.new("libs", {:url => 'git://github.com/HaxeFoundation/ocamllibs.git'})
 # good idea to use cppo github url? Or release? Let's hope its stable
 Repository.new("cppo", {:url => 'https://github.com/mjambon/cppo.git'}) \
-          .add_target(["cppo/cppo"], "make -C cppo") \
-          .clean_command("make -C cppo clean")
+          .add_target(["cppo/cppo"], ["make -C cppo"]) \
+          .clean_command(["make -C cppo clean"])
 
 Repository.new("deriving", {:url => "git://github.com/jaked/deriving.git"}, Dir["deriving/**/*.ml", "deriving/**/*.mli"]) \
-          .add_target(["deriving/syntax/deriving"], "make -C deriving") \
-          .clean_command("make -C deriving clean")
+          .add_target(["deriving/syntax/deriving"], ["make -C deriving"]) \
+          .clean_command(["make -C deriving clean"])
+
+Repository.new('extunix', {:url => 'https://forge.ocamlcore.org/frs/download.php/1146/ocaml-extunix-0.0.6.tar.gz', :type => :tar_gz, :rename => ['ocaml-extunix-0.0.6', 'extunix']} )
+          .add_target(["extunix/_build/src/extunix.cmxa"], ["cd extunix; ./configure && make"]) \
+
 
 # getting ml file dependencies from official Makefile - yes this sucks - but is likely to work:
 
@@ -299,7 +383,6 @@ $libs = Hash.new
 
 # lib controlled by rake
 class Lib
-  include Rake::DSL
 
   def initialize(path, name, files)
     @path = path
@@ -326,10 +409,8 @@ class Lib
 
   def clean_task; "clean_#{@path}"; end
 
-  def create_rake_task(native)
-    task clean_task do
-      clean_dir "clean_#{@path}"
-    end
+  def tasks(native)
+    My_CleanTask.new(clean_task, "libs/#{@path}")
     lib_name = "#{@name}.LEXT"
     all_deps = []
 
@@ -342,17 +423,17 @@ class Lib
       all_deps += [ lib_name, k ]
       file_deps.each {|d| all_deps += [ k, d ] }
 
-      my_multifile(native, goal => ["libs"] + (file_deps).map {|d| "libs/#{@path}/#{@files[d][:goal]}"}) do
-        ocaml_includes = @needs.map {|v| "-I ../#{v}"}
-        case k
-        when /\.c$/
-          sh "cd libs/#{@path}; ocamlc #{v[:CFLAGS]} extc_stubs.c".ocaml_native(native)
-        when /\.ml$/
-          sh "cd libs/#{@path}; OCAML #{v[:CFLAGS]} #{ocaml_includes.join(' ')} -c #{k}i".ocaml_native(native) if File.exist? "libs/#{@path}/#{k}i"
-          sh "cd libs/#{@path}; OCAML #{v[:CFLAGS]} #{ocaml_includes.join(' ')} -c #{k}".ocaml_native(native)
-        else; raise "TODO #{k}"
-        end
+      cmds = []
+      ocaml_includes = @needs.map {|v| "-I ../#{v}"}
+      case k
+      when /\.c$/
+        cmds << "cd libs/#{@path}; ocamlc #{v[:CFLAGS]} extc_stubs.c".ocaml_native(native)
+      when /\.ml$/
+        cmds << "cd libs/#{@path}; OCAML #{v[:CFLAGS]} #{ocaml_includes.join(' ')} -c #{k}i".ocaml_native(native) if File.exist? "libs/#{@path}/#{k}i"
+        cmds << "cd libs/#{@path}; OCAML #{v[:CFLAGS]} #{ocaml_includes.join(' ')} -c #{k}".ocaml_native(native)
+      else; raise "TODO #{k}"
       end
+      My_FileTask.new(native,  {goal => ["libs"] + @needs.map {|lib_name| $libs[lib_name].main_target } + (file_deps).map {|d| "libs/#{@path}/#{@files[d][:goal]}"} }, cmds)
     }
     # create library task
 
@@ -362,18 +443,16 @@ class Lib
       lib_deps << @files[n][:goal] unless n == lib_name || @files[n][:goal] =~ /\.o$/
     } 
 
-    my_multifile(native, "#{main_target}" => file_goals) do
-      sh "cd libs/#{@path}; OCAML -a -o #{lib_name} #{lib_deps.join(' ')}".ocaml_native(native)
-    end
+    My_FileTask.new(native, {"#{main_target}" => file_goals },
+    ["cd libs/#{@path}; OCAML -a -o #{lib_name} #{lib_deps.join(' ')}".ocaml_native(native)])
 
-    multitask :compile_libs => main_target do end
-    multitask @path.to_sym => main_target do end
+    My_Task.new({:compile_libs => [main_target]}, [])
+    My_Task.new({@path.to_sym => [main_target]}, [])
   end
 end
 
 # lib still controlled by make
 class LibMake
-  include Rake::DSL
 
   attr_reader :name, :targets, :needs
   def initialize(name, targets)
@@ -390,24 +469,19 @@ class LibMake
   def main_target; @main_target ||= "libs/#{@name}/#{@targets[0]}"; @main_target end
   def prerequisites; @needs.map {|v| $libs[v].main_target } end
 
-  def create_rake_task(native)
-    task clean_task do
-      sh "make -C libs/#{@name} clean"
-    end
+  def tasks(native)
+    My_Task.new(clean_task, [ "make -C libs/#{@name} clean"])
 
-    my_multifile(native, "#{main_target}" => ["libs"] + prerequisites) do
-      puts "EXISTS " if File.exist? main_target
-      make_args = @make_args.map {|v| " #{v}"}.join('')
-      sh "make -C libs/#{@name} #{native == "native" ? "native" : "bytecode"}"
-    end
+    make_args = @make_args.map {|v| " #{v}"}.join('')
+    My_FileTask.new(native, {"#{main_target}" => ["libs"] + prerequisites}, ["make -C libs/#{@name} #{native == "native" ? "native" : "bytecode"}"])
 
     # for each alternative target create a new task:
     # targets.drop(1).each do |t|
     #   my_multifile "libs/#{@name}/#{t}" => lib.main_target
     # end
 
-    my_multitask(native, :compile_libs => main_target) do end
-    my_multitask(native, name.to_sym => main_target) do end
+    My_Task.new({:compile_libs => [main_target]}, [])
+    My_Task.new({name.to_sym => [main_target]}, [])
   end
 
   def clean_task; "clean_#{@name}"; end
@@ -445,7 +519,7 @@ Lib.new("neko", "neko", {
           "nxml.ml" => {:deps => %w{nast.ml}},
           "binast.ml" => {:deps => %w{nast.ml}},
           "nbytecode.ml" => nil,
-          "ncompile.ml" => nil,
+          "ncompile.ml" => {:deps => %w{nbytecode.ml}},
         }).add_lib_dependencies(:extlib)
 
 LibMake.new(:javalib, ["java.LEXT"]).add_lib_dependencies(:extlib)
@@ -483,8 +557,7 @@ dg = RGL::DirectedAdjacencyGraph.__send__(:[], *deps )
 # rake tasks {{{1
 # ===============
 
-task :help do
-puts <<-EOF
+HELP_TEXT=<<-EOF
 usage:
 
 drake haxe.native
@@ -521,9 +594,12 @@ libs/*: some Makefiles are no longer used. See LibMake usage in Rakefile
 
 state
 ============================
-this seems to work reasnably well.
-It should be doable creating the makefiles from this ruby file
+If you change backends you have to drake haxe_clean, then recompile
+
 EOF
+
+task :help do
+  puts HELP_TEXT
 end
 
 # cleaning {{{2
@@ -534,7 +610,7 @@ def delete_files(*files)
 end
 
 def clean_dir(path)
-  files = Dir.__send__(:[], *["*.cmx", "*.cmi", "*.cmo", "*.cma", "*.cmxa", "*.annot", "*.o","*.a"].map {|v| "#{path}/#{v}" })
+  files = Dir.__send__(:[], *EXTS_TO_CLEAN.map {|v| "#{path}/#{v}" })
   puts "cleaning #{files}"
   delete_files(*files)
 end
@@ -544,16 +620,13 @@ task :clean do
   raise "there is no :clean target. Try clean_haxe, clean_libs, clean_all"
 end
 
-task :clean_haxe do
-  clean_dir "./"
-end
+My_CleanTask.new(:clean_haxe, "./", ["haxe.native", "haxe.bytecode"])
 
 task :clean_graph do
   delete_files("graph.jpg","graph.dot")
 end
 
-task :clean_all => [:clean_haxe, :clean_libs, :clean_graph] do
-end
+My_Task.new({:clean_all => [:clean_haxe, :clean_libs, :clean_graph]}, [])
 
 # dependency graph of ./*.ml files: {{{2
 
@@ -567,18 +640,19 @@ end
 
 # rake targets {{{3
 
+
+My_Task.new({:default => [:help] }, [])
+
+
 # cleaning:
-task :clean_libs => $libs.map {|k,v| v.clean_task } do
-end
+My_Task.new({:clean_libs => $libs.map {|k,v| v.clean_task}}, [])
 
 # building
 ACTIVE_FLAVOURS.each do |flavour|
   native = flavour.clone
-  $repositories.each_pair {|k,r| r.create_rake_task(flavour) }
-
-  $deps_hash.each_pair {|k,ml| ml.create_rake_task(flavour) }
-
-  $libs.each_pair {|k,v| v.create_rake_task(flavour)}
+  $repositories.each_pair {|k,r| r.tasks(flavour) }
+  $deps_hash.each_pair {|k,ml| ml.tasks(flavour) }
+  $libs.each_pair {|k,v| v.tasks(flavour) }
 
   # haxe target
   haxe_local_deps = []
@@ -593,34 +667,93 @@ ACTIVE_FLAVOURS.each do |flavour|
 
   libs_deps.map! {|v| $libs[v].main_target }
   haxe_goal = "haxe.#{native}"
-  my_multifile native, haxe_goal => ["libs/"] + haxe_local_deps + libs_deps do
-    # TODO
-    libs = []
-    libs << "-cclib"
-    libs << "libs/extc/extc_stubs.o"
-    libs << "-cclib"
-    libs << "-lz"
-    libs << "unix.LEXT"
-    libs << "str.LEXT"
-    libs << "libs/extlib/extLib.LEXT"
-    libs << "libs/xml-light/xml-light.LEXT"
-    libs << "libs/swflib/swflib.LEXT" if ACTIVE_BACKENDS.include? :swf
-    libs << "libs/extc/extc.LEXT"
-    libs << "libs/neko/neko.LEXT"
-    libs << "libs/javalib/java.LEXT" if ACTIVE_BACKENDS.include? :java
-    libs << "libs/ziplib/zip.LEXT" if ACTIVE_BACKENDS.include? :java or ACTIVE_BACKENDS.include? :swf
-    libs << "libs/ttflib/ttf.LEXT" if ACTIVE_BACKENDS.include? :swf
-    if DERIVING_SUPPORT
-      libs << ["-I #{DERIVING_PATH}/lib", " -I #{DERIVING_PATH}/syntax"]
-      libs << ["nums.LEXT", "show.CEXT"]
-    end
-    sh "OCAML #{DEBUGGING_SUPPORT} #{native == "native" ? "" : "-custom"} #{libs.join(' ')} -o #{haxe_goal} #{haxe_local_deps.join(' ')}".ocaml_native(native)
+
+  # TODO
+  libs = []
+  libs << "-cclib"
+  libs << "libs/extc/extc_stubs.o"
+  libs << "-cclib"
+  libs << "-lz"
+  libs << "unix.LEXT"
+  libs << "str.LEXT"
+  libs << "libs/extlib/extLib.LEXT"
+  libs << "libs/xml-light/xml-light.LEXT"
+  libs << "libs/swflib/swflib.LEXT" if ACTIVE_BACKENDS.include? :swf
+  libs << "libs/extc/extc.LEXT"
+  libs << "libs/neko/neko.LEXT"
+  libs << "libs/javalib/java.LEXT" if ACTIVE_BACKENDS.include? :java
+  libs << "libs/ziplib/zip.LEXT" if ACTIVE_BACKENDS.include? :java or ACTIVE_BACKENDS.include? :swf
+  libs << "libs/ttflib/ttf.LEXT" if ACTIVE_BACKENDS.include? :swf
+  if DERIVING_SUPPORT
+    libs << ["-I #{DERIVING_PATH}/lib", " -I #{DERIVING_PATH}/syntax"]
+    libs << ["nums.LEXT", "show.CEXT"]
   end
 
+  My_FileTask.new(native, {haxe_goal => ["libs/"] + haxe_local_deps + libs_deps},
+    [ "OCAML #{DEBUGGING_SUPPORT} #{native == "native" ? "" : "-custom"} #{libs.join(' ')} -o #{haxe_goal} #{haxe_local_deps.join(' ')}".ocaml_native(native) ]
+  )
 end
 
-task :haxe => ACTIVE_FLAVOURS.map {|v| "haxe.#{v}"} do
+My_Task.new({ :haxe => ACTIVE_FLAVOURS.map {|v| "haxe.#{v}"} }, [])
+
+$tasks.each {|v| v.rake_task }
+
+class MakefileWriter
+  def initialize()
+    @items = []
+    @cache = Hash.new
+  end
+
+  def write(s)
+    @items << s unless @cache.include? s
+    @cache[s] = true
+  end
+
+  def string
+    return @items.join("\n")
+  end
 end
 
-task :default => [:help]  do
+task :makefile do
+  out = MakefileWriter.new
+
+  out.write(<<-EOF)
+# this makefile was created by Rakefile
+# TODO: don't depend on libraries if backends are dropped
+# you always have to enable BACKEND_neko
+#
+# important targets:
+# haxe: creates haxe.native and haxe.bytecode
+# haxe_clean: cleans haxe (has to be run if you enable disable backends,
+# because timestamps don't change..
+  EOF
+
+  out.write("# BACKEND_X=yes: comment to disable backend")
+  backend_files.each_pair {|k,v|
+    out.write("#{k == :neko ? "" : "# "}BACKEND_#{k}=yes")
+  }
+  out.write("")
+
+  out.write("")
+  HELP_TEXT.split("\n").each {|v|
+    out.write("# #{v.gsub("drake", "make")}")
+  }
+  out.write("")
+
+
+  $tasks.each {|v| v.makefile(out) }
+
+  makefile = out.string
+
+  backend_files.each_pair {|k,v|
+    makefile = makefile.gsub("-D BACKEND_#{k}", "$(if ${BACKEND_#{k}}, -D BACKEND_#{k},)")
+
+    v.each {|file|
+      # mind the space, this does not drop rules at ^
+      makefile = makefile.gsub(" #{file}.cmx", " $(if ${BACKEND_#{k}}, #{file}.cmx,)")
+      makefile = makefile.gsub(" #{file}.cmo", " $(if ${BACKEND_#{k}}, #{file}.cmo,)")
+    }
+  }
+
+  File.open('makefile-generated-by-make', "wb") { |file| file.write(makefile) }
 end
