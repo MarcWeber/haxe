@@ -1016,6 +1016,7 @@ let dump_descriptor gen name path_s module_s =
   SourceWriter.newline w;
   SourceWriter.write w "begin libs";
   SourceWriter.newline w;
+#ifdef BACKEND_java
   if Common.platform gen.gcon Java then
     List.iter (fun (s,std,_,_,_) ->
       if not std then begin
@@ -1023,6 +1024,7 @@ let dump_descriptor gen name path_s module_s =
         SourceWriter.newline w;
       end
     ) gen.gcon.java_libs;
+#endif
   SourceWriter.write w "end libs";
 
   let contents = SourceWriter.contents w in

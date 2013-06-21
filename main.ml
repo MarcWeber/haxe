@@ -22,7 +22,9 @@
 
 open Printf
 open Ast
+#ifdef BACKEND_swf
 open Genswf
+#endif
 open Common
 open Type
 
@@ -45,6 +47,8 @@ exception Abort
 exception Completion of string
 
 let version = 310
+
+let fail_disabled_platform p = failwith ("haxe compiled without " ^ p)
 
 let measure_times = ref false
 let prompt = ref false
@@ -235,6 +239,7 @@ let rec read_type_path com p =
 			end;
 		) r;
 	) com.class_path;
+#ifdef BACKEND_swf
 	List.iter (fun (_,_,extract) ->
 		Hashtbl.iter (fun (path,name) _ ->
 			if path = p then classes := name :: !classes else
@@ -247,6 +252,8 @@ let rec read_type_path com p =
 			loop path p
 		) (extract());
 	) com.swf_libs;
+#endif
+#ifdef BACKEND_java
   List.iter (fun (path,std,close,all_files,lookup) ->
     List.iter (fun (path, name) ->
       if path = p then classes := name :: !classes else
@@ -259,6 +266,7 @@ let rec read_type_path com p =
       loop path p
     ) (all_files())
   ) com.java_libs;
+#endif
 	unique !packages, unique !classes
 
 let delete_file f = try Sys.remove f with _ -> ()
@@ -920,14 +928,26 @@ try
 				_ -> raise (Arg.Bad "Invalid SWF header format, expected width:height:fps[:color]")
 		),"<header> : define SWF header (width:height:fps:color)");
 		("-swf-lib",Arg.String (fun file ->
+#ifdef BACKEND_swf
 			process_libs(); (* linked swf order matters, and lib might reference swf as well *)
 			Genswf.add_swf_lib com file false
+#else
+                        fail_disabled_platform "flash"
+#endif
 		),"<file> : add the SWF library to the compiled SWF");
 		("-swf-lib-extern",Arg.String (fun file ->
+#ifdef BACKEND_swf
 			Genswf.add_swf_lib com file true
+#else
+                        fail_disabled_platform "flash"
+#endif
 		),"<file> : use the SWF library for type checking");
 		("-java-lib",Arg.String (fun file ->
+#ifdef BACKEND_java
 			Genjava.add_java_lib com file false
+#else
+                        fail_disabled_platform "java"
+#endif
 		),"<file> : add an external JAR or class directory library");
 		("-x", Arg.String (fun file ->
 			let neko_file = file ^ ".n" in
@@ -965,11 +985,13 @@ try
 		("--no-traces", define Define.NoTraces, ": don't compile trace calls in the program");
 		("--gen-hx-classes", Arg.Unit (fun() ->
 			force_typing := true;
+#ifdef BACKEND_swf
 			pre_compilation := (fun() ->
 				List.iter (fun (_,_,extract) ->
 					Hashtbl.iter (fun n _ -> classes := n :: !classes) (extract())
 				) com.swf_libs;
 			) :: !pre_compilation;
+#endif
 			xml_out := Some "hx"
 		),": generate hx headers for all input classes");
 		("--next", Arg.Unit (fun() -> assert false), ": separate several haxe compilations");
@@ -1135,6 +1157,7 @@ try
 			set_platform Cross "";
 			"?"
 		| Flash8 | Flash ->
+#ifdef BACKEND_swf
 			if com.flash_version >= 9. then begin
 				let rec loop = function
 					| [] -> ()
@@ -1157,22 +1180,46 @@ try
 				add_std "flash8";
 			end;
 			"swf"
+#else
+                        fail_disabled_platform "swf"
+#endif
 		| Neko ->
+#ifdef BACKEND_neko
 			add_std "neko";
 			"n"
+#else
+                        fail_disabled_platform "neko"
+#endif
 		| Js ->
+#ifdef BACKEND_js
 			add_std "js";
 			"js"
+#else
+                        fail_disabled_platform "js"
+#endif
 		| Php ->
+#ifdef BACKEND_php
 			add_std "php";
 			"php"
+#else
+                        fail_disabled_platform "php"
+#endif
 		| Cpp ->
+#ifdef BACKEND_cpp
 			add_std "cpp";
 			"cpp"
+#else
+                        fail_disabled_platform "cpp"
+#endif
 		| Cs ->
+#ifdef BACKEND_cs
 			Gencs.before_generate com;
 			add_std "cs"; "cs"
+#else
+                        fail_disabled_platform "cs"
+#endif
 		| Java ->
+#ifdef BACKEND_java
       let old_flush = ctx.flush in
       ctx.flush <- (fun () ->
         List.iter (fun (_,_,close,_,_) -> close()) com.java_libs;
@@ -1180,6 +1227,9 @@ try
       );
 			Genjava.before_generate com;
 			add_std "java"; "java"
+#else
+                        fail_disabled_platform "java"
+#endif
 	) in
 	(* if we are at the last compilation step, allow all packages accesses - in case of macros or opening another project file *)
 	if com.display && not ctx.has_next then com.package_rules <- PMap.foldi (fun p r acc -> match r with Forbidden -> acc | _ -> PMap.add p r acc) com.package_rules PMap.empty;
@@ -1273,28 +1323,44 @@ try
 			()
 		| Flash8 | Flash when !gen_as3 ->
 			Common.log com ("Generating AS3 in : " ^ com.file);
+#ifdef BACKEND_swf
 			Genas3.generate com;
+#endif
 		| Flash8 | Flash ->
 			Common.log com ("Generating swf : " ^ com.file);
+#ifdef BACKEND_swf
 			Genswf.generate com !swf_header;
+#endif
 		| Neko ->
 			Common.log com ("Generating neko : " ^ com.file);
+#ifdef BACKEND_neko
 			Genneko.generate com;
+#endif
 		| Js ->
 			Common.log com ("Generating js : " ^ com.file);
+#ifdef BACKEND_js
 			Genjs.generate com
+#endif
 		| Php ->
 			Common.log com ("Generating PHP in : " ^ com.file);
+#ifdef BACKEND_php
 			Genphp.generate com;
+#endif
 		| Cpp ->
 			Common.log com ("Generating Cpp in : " ^ com.file);
+#ifdef BACKEND_cpp
 			Gencpp.generate com;
+#endif
 		| Cs ->
 			Common.log com ("Generating Cs in : " ^ com.file);
+#ifdef BACKEND_cs
 			Gencs.generate com;
+#endif
 		| Java ->
 			Common.log com ("Generating Java in : " ^ com.file);
+#ifdef BACKEND_java
 			Genjava.generate com;
+#endif
 		);
 	end;
 	Sys.catch_break false;

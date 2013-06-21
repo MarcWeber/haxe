@@ -133,8 +133,12 @@ type context = {
 	mutable php_front : string option;
 	mutable php_lib : string option;
 	mutable php_prefix : string option;
+#ifdef BACKEND_swf
 	mutable swf_libs : (string * (unit -> Swf.swf) * (unit -> ((string list * string),As3hl.hl_class) Hashtbl.t)) list;
+#endif
+#ifdef BACKEND_java
 	mutable java_libs : (string * bool * (unit -> unit) * (unit -> ((string list * string) list)) * ((string list * string) -> ((JData.jclass * string * string) option))) list;
+#endif
 	mutable js_gen : (unit -> unit) option;
 	(* typing *)
 	mutable basic : basic_types;
@@ -605,8 +609,12 @@ let create v args =
 		resources = Hashtbl.create 0;
 		php_front = None;
 		php_lib = None;
+#ifdef BACKEND_swf
 		swf_libs = [];
+#endif
+#ifdef BACKEND_java
 		java_libs = [];
+#endif
 		neko_libs = [];
 		php_prefix = None;
 		js_gen = None;

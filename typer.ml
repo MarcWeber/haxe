@@ -3519,6 +3519,7 @@ let make_macro_api ctx p =
 			let tp = get_type_patch ctx t (match f with None -> None | Some f -> Some (f,s)) in
 			tp.tp_meta <- tp.tp_meta @ m;
 		);
+#ifdef BACKEND_js
 		Interp.set_js_generator = (fun gen ->
 			let js_ctx = Genjs.alloc_ctx ctx.com in
 			ctx.com.js_gen <- Some (fun() ->
@@ -3569,6 +3570,7 @@ let make_macro_api ctx p =
 				t()
 			);
 		);
+#endif
 		Interp.get_local_type = (fun() ->
 			match ctx.g.get_build_infos() with
 			| Some (mt,_) ->

@@ -107,7 +107,9 @@ type extern_api = {
 	allow_package : string -> unit;
 	type_patch : string -> string -> bool -> string option -> unit;
 	meta_patch : string -> string -> string option -> bool -> unit;
+#ifdef BACKEND_js
 	set_js_generator : (value -> unit) -> unit;
+#endif
 	get_local_type : unit -> t option;
 	get_local_method : unit -> string;
 	get_local_using : unit -> tclass list;
@@ -172,6 +174,7 @@ type access =
 
 exception Runtime of value
 exception Builtin_error
+exception FeatureDependsOnDisabledPlatform of string
 
 exception Error of string * Ast.pos list
 
@@ -2318,12 +2321,16 @@ let macro_lib =
 		"custom_js", Fun1 (fun f ->
 			match f with
 			| VFunction (Fun1 _) ->
+#ifdef BACKEND_js
 				let ctx = get_ctx() in
 				ctx.curapi.set_js_generator (fun api ->
 					ignore(catch_errors ctx (fun() -> ctx.do_call VNull f [api] null_pos));
 				);
 				VNull
-			| _ -> error()
+#else
+                                raise (FeatureDependsOnDisabledPlatform "custom_js")
+#endif
+			| _ -> (error() : value)
 		);
 		"get_pos_infos", Fun1 (fun p ->
 			match p with
@@ -2399,7 +2406,12 @@ let macro_lib =
 			| VString file ->
 				let com = ccom() in
 				(match com.platform with
-				| Flash -> Genswf.add_swf_lib com file false
+                                | Flash ->
+#ifdef BACKEND_swf
+                                            Genswf.add_swf_lib com file false
+#else
+                                            (raise (FeatureDependsOnDisabledPlatform "add_native_lib") : unit)
+#endif
 				| _ -> failwith "Unsupported platform");
 				VNull
 			| _ ->
