@@ -755,5 +755,5 @@ task :makefile do
     }
   }
 
-  File.open('makefile-generated-by-make', "wb") { |file| file.write(makefile) }
+  File.open('makefile-generated-by-rake', "wb") { |file| file.write(makefile) }
 end
