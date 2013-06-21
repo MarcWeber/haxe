@@ -174,7 +174,7 @@ type access =
 
 exception Runtime of value
 exception Builtin_error
-exception FeatureDependsOnDisabledPlatform
+exception FeatureDependsOnDisabledPlatform of string
 
 exception Error of string * Ast.pos list
 
@@ -2406,8 +2406,8 @@ let macro_lib =
 			| VString file ->
 				let com = ccom() in
 				(match com.platform with
-                               | Flash ->
-#ifdef BACKEND_flash
+                                | Flash ->
+#ifdef BACKEND_swf
                                             Genswf.add_swf_lib com file false
 #else
                                             (raise (FeatureDependsOnDisabledPlatform "add_native_lib") : unit)

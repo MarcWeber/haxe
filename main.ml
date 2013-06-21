@@ -239,6 +239,7 @@ let rec read_type_path com p =
 			end;
 		) r;
 	) com.class_path;
+#ifdef BACKEND_swf
 	List.iter (fun (_,_,extract) ->
 		Hashtbl.iter (fun (path,name) _ ->
 			if path = p then classes := name :: !classes else
@@ -251,6 +252,8 @@ let rec read_type_path com p =
 			loop path p
 		) (extract());
 	) com.swf_libs;
+#endif
+#ifdef BACKEND_java
   List.iter (fun (path,std,close,all_files,lookup) ->
     List.iter (fun (path, name) ->
       if path = p then classes := name :: !classes else
@@ -263,6 +266,7 @@ let rec read_type_path com p =
       loop path p
     ) (all_files())
   ) com.java_libs;
+#endif
 	unique !packages, unique !classes
 
 let delete_file f = try Sys.remove f with _ -> ()
@@ -981,11 +985,13 @@ try
 		("--no-traces", define Define.NoTraces, ": don't compile trace calls in the program");
 		("--gen-hx-classes", Arg.Unit (fun() ->
 			force_typing := true;
+#ifdef BACKEND_swf
 			pre_compilation := (fun() ->
 				List.iter (fun (_,_,extract) ->
 					Hashtbl.iter (fun n _ -> classes := n :: !classes) (extract())
 				) com.swf_libs;
 			) :: !pre_compilation;
+#endif
 			xml_out := Some "hx"
 		),": generate hx headers for all input classes");
 		("--next", Arg.Unit (fun() -> assert false), ": separate several haxe compilations");
@@ -1151,7 +1157,7 @@ try
 			set_platform Cross "";
 			"?"
 		| Flash8 | Flash ->
-#ifdef BACKEND_flash
+#ifdef BACKEND_swf
 			if com.flash_version >= 9. then begin
 				let rec loop = function
 					| [] -> ()
@@ -1213,12 +1219,12 @@ try
                         fail_disabled_platform "cs"
 #endif
 		| Java ->
+#ifdef BACKEND_java
       let old_flush = ctx.flush in
       ctx.flush <- (fun () ->
         List.iter (fun (_,_,close,_,_) -> close()) com.java_libs;
         old_flush()
       );
-#ifdef BACKEND_java
 			Genjava.before_generate com;
 			add_std "java"; "java"
 #else
@@ -1317,7 +1323,7 @@ try
 			()
 		| Flash8 | Flash when !gen_as3 ->
 			Common.log com ("Generating AS3 in : " ^ com.file);
-#ifdef BACKEND_flash
+#ifdef BACKEND_swf
 			Genas3.generate com;
 #endif
 		| Flash8 | Flash ->
