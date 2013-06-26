@@ -16,92 +16,328 @@
 # Now that generating makefiles is supported I could have used haxe ? what
 # about rgl depth_first_visit implementation?
 
-# CONFIGURATION: {{{1
-# ==================
+
+require "set"
 require 'rgl/adjacency'
 require "rgl/traversal"
-require "set"
+require 'rgl/connected_components'
+require 'rgl/topsort'
 
 ALL_BACKENDS= [:neko, :as3, :cpp, :cs, :js, :php, :java, :swf]
+ACTIVE_BACKENDS = [:neko]
 
-# eg set to [:neko] only:
-ACTIVE_BACKENDS = ALL_BACKENDS
 
-# additional flags:
-ANNOT = "-dtypes" # "-dtypes" or "-annot" or ""
-
-DERIVING_PATH = "deriving"
-DERIVING_SUPPORT = false
-
-CPPO_PATH="cppo/cppo"
-
-DEBUGGING_SUPPORT="-g" # "-g" or ""
-
-FLAVOURS = ["native", "bytecode"]
-
-ACTIVE_FLAVOURS = FLAVOURS
+BACKEND_FILES = Hash.new
+BACKEND_FILES[:swf] = %w{genswf8.ml genswf9.ml genswf.ml}
+BACKEND_FILES[:neko] = %w{genneko.ml}
+BACKEND_FILES[:as3] = %w{genas3.ml}
+BACKEND_FILES[:cpp] = %w{gencpp.ml}
+BACKEND_FILES[:cs] = %w{gencs.ml}
+BACKEND_FILES[:java] = %w{genjava.ml}
+BACKEND_FILES[:js] = %w{genjs.ml}
+BACKEND_FILES[:php] = %w{genphp.ml}
 
 # utils {{{1
 # ==========
-INCLUDES=%w{libs/extlib libs/extc libs/neko libs/javalib libs/ziplib libs/swflib libs/xml-light libs/ttflib}
+INCLUDES=%w{}
 CFLAGS_BACKEND = []
 EXTS_TO_CLEAN = ["*.cmx", "*.cmi", "*.cmo", "*.cma", "*.cmxa", "*.annot", "*.o","*.a"]
 
-class String
-  # bad style
-  def ocaml_native(native)
-    if native == "native"
-      self.gsub(".LEXT", ".cmxa").gsub(".CEXT", ".cmx").gsub("OCAML", "ocamlopt")
-    else
-      self.gsub(".LEXT", ".cma").gsub(".CEXT", ".cmo").gsub("OCAML", "ocamlc")
+def clean_dir(path)
+  files = Dir.__send__(:[], *EXTS_TO_CLEAN.map {|v| "#{path}/#{v}" })
+  puts "cleaning #{files}"
+  delete_files(*files)
+end
+
+def delete_files(*files)
+  files.each {|v|
+    File.delete v if File.exist? v
+  }
+end
+
+# rake {{{2
+module Rake
+  class DirTask < Task
+    def timestamp
+      Time.at(0)
+    end
+
+    # don't check timestamps
+    def needed?; 
+      ! File.exist?(name);
     end
   end
+end
 
-  def assert_ocaml_native()
-    raise "native or bytecode expected" unless %w{native bytecode}.include? self
+# rake version
+# module Rake
+#   class Task
+#     def multi
+#       self.instance_eval {
+#         def invoke_prerequisites(a,b)
+#           puts "HERE"
+#           invoke_prerequisites_concurrently(a,b)
+#         end
+#       }
+#     end
+#   end
+# end
+
+# drake version
+class MultiFile < Rake::FileTask
+  private
+  # rake
+  # def invoke_prerequisites(task_args, invocation_chain) # :nodoc:
+  #   invoke_prerequisites_concurrently(task_args, invocation_chain)
+  # end
+
+  # drake:
+  def invoke_prerequisites(args, invocation_chain)
+    threads = @prerequisites.collect { |p|
+      Thread.new(p) { |r| application[r, @scope].invoke_with_call_chain(args, invocation_chain) }
+    }
+    threads.each { |t| t.join }
+  end
+
+end
+
+def my_multifile(hash = {}, *args, &block)
+    # file(*args, &block)
+    MultiFile.define_task(hash, *args, &block)
+end
+
+class ArrayOfHashes
+  def initialize(*hashes)
+    @hashes = hashes
+  end
+
+  def values(key); @hashes.map {|v| v[key]}.compact; end
+
+  def first(key) values(key).first; end
+  def join_array(key) values(key).flatten(1); end
+end
+
+
+# assertions {{{2
+
+class Object
+  def assert_not_null; self; end
+  def assert_array; assert "should be a list"; end
+end
+
+class Null
+  def assert_not_null; raise "should not have been null"; end
+end
+
+class Arary
+  def assert_array; self; end
+end
+
+
+# ocaml(c/opt) {{{2
+
+
+
+class OcamlLinkFlags
+  def initialize(*args)
+    @args = args
+  end
+  def ocaml_link_flags; @args; end
+  def ocaml_cflags; []; end
+end
+
+class LibMake
+
+  attr_reader :o
+  def initialize(opts)
+    @o = opts
+    cc = opts[:compiler]
+    @o[:depends_on] = []
+    @o[:target_rel] = @o[:target_rel].gsub(/\LIB_EXT$/, cc.lib_ext)
+    @o[:target_absolute] = File.join(@o[:base_dir], @o[:target_rel])
+    @name = File.basename(@o[:base_dir])
+  end
+
+  def ocaml_cflags; ["-I", File.absolute_path(@o[:base_dir])]; end
+  def ocaml_link_flags; o.fetch(:lib_flags, []) + [main_target]; end 
+
+  def main_target; @o[:target_absolute]; end
+
+  def tasks
+    My_Task.new({clean_task => []}, [ "make -C libs/#{@name} clean"])
+
+    make_args = (@o[:make_args_by_compiler] || {})[@o[:compiler].cc] || []
+    My_FileTask.new({main_target => ["libs"] + @o.fetch(:depends_on, [])},
+    [ "make -C libs/#{@name} #{@o[:compiler].cc == "ocamlopt" ? "native" : "bytecode"}",
+      # we track more dependencies than the makefile, so the makefile may not
+      # touch the library file causing rebuilds again and again, so update the
+      # timestamp
+      "touch #{main_target}"
+    ]
+    )
+
+    # TODO refactor?, make it an configuration option
+    My_Task.new({:compile_libs => [main_target]}, [])
+    My_Task.new({@name.to_sym => [main_target]}, [])
     self
   end
+
+  def clean_task; "clean_#{@name}"; end
+end
+
+class OcamlCC
+  def compile_file(*options)
+    o = ArrayOfHashes.new(*options)
+    base_dir = o.first(:base_dir)
+    action = o.first(:action)
+    out = o.first(:out)
+
+    libs_cflags = o.join_array(:depends_on).flatten(1).map{|v| v.ocaml_cflags}.join(' ')
+
+    cppo_executable_fun = o.first(:cppo_executable_fun)
+
+    # cppo
+    cppo_flags = o.join_array(:cppo_flags)
+    use_cppo = (o.values(:use_cppo).detect {|v| !!v}) || (cppo_flags.length > 0)
+
+    # camlp4
+    camlp4_flags = o.join_array(:camlp4_flags)
+    camlp4_suggestions = o.values(:camlp4) || ['camlp4']
+    raise "multiple camlp4 suggestions #{camlp4_suggestions}" if camlp4_suggestions.length > 1
+    camlp4 = camlp4_suggestions.first
+
+    includes     = o.join_array(:includes).map {|v| v.ocaml_cflags }.flatten(1)
+    dependencies = o.join_array(:dependencies).flatten(1)
+
+    pre_flags = ""
+    pre_flags = ""
+
+    cmd = case action
+    when :compile_ml
+      [ cc,
+      libs_cflags,
+      includes.map {|v| "-I #{v}"},
+      action != :link && use_cppo ? "-pp '#{cppo_executable_fun.call} #{cppo_flags.join(' ')}'" : "",
+      action != :link && camlp4 ? "-pp '#{camlp4} #{camlp4_flags.join(' ')}'" : "",
+      dependencies,
+      "-o #{o.first(:out)} -c #{o.first(:in)}"
+      ]
+    when :link_lib
+      [ cc,
+      "-a -o #{o.first(:out)}",
+      dependencies
+      ]
+    when :link_executable
+      [ cc,
+      "#{custom} -o #{o.first(:out)}",
+      dependencies
+      ]
+    else raise "unexpected #{action}"
+    end
+    cmd.join(' ')
+  end
+
+  def cc_compile(*args)
+    compile_file({:action => :compile_ml}, *args)
+  end
+  def cc_link(*args)
+    compile_file(*args)
+  end
+
+  def ml_mod_ext(s); s.gsub(/ml$/, ext_mod).gsub(/mli$/, "cmi"); end
+end
+
+class Ocamlopt < OcamlCC
+  def exe_suffix; ""; end
+  def ext_mod; "cmx"; end
+  def lib_ext; "cmxa"; end
+  def cc; "ocamlopt"; end
+  def custom; ""; end
+end
+
+class OcamlC < OcamlCC
+  def exe_suffix; ".byte"; end
+  def ext_mod; "cmo"; end
+  def lib_ext; "cma"; end
+  def cc; "ocamlc"; end
+  def custom; "-custom"; end
 end
 
 class Array
   # bad style
-  def ocaml_native(native)
-    self.map {|v| v.ocaml_native(native)}
-  end
+  def ocaml_as_includes; self; end
+  def ocaml_link_flags; self; end
 end
 
 class Symbol
-  def ocaml_native(native)
-    self
-  end
+  def main_target; self; end
+end
+
+class String
+  def main_target; self; end
 end
 
 class Hash
   # bad style
-  def ocaml_native(native)
+  def rewrite_deps
+    Hash[self.map {|k, list| [k, list.select {|v| v.respond_to? :main_target}.map {|v| v.main_target} ] } ]
+  end
+end
+
+# dgl {{{2
+
+class Hash
+  def to_adjecent
+    r = []
+    each_pair {|k,list| (list || []).each {|v| r << k; r << v } }
+    r
+  end
+end
+
+class Array
+  def count_unique_items
     h = Hash.new
-    self.each_pair {|k,v| h[k.ocaml_native(native)] = v.ocaml_native(native) }
+    each {|v| h[v] ||= 0; h[v] += 1}
     h
   end
 end
+
+
+# task abstraction {{{2
 
 $tasks = []
 
 # provides makefile implementation for My_FileTask My_Task
 class My_MakeFileTask
   def makefile(out)
-    hash = case @hash
-    when Hash; @hash
-    when String; { @hash => [] }
-    end
-    raise "unexpected" if hash.keys.length > 1
-    hash.each_pair {|k,v|
+    @hash.each_pair {|k,v|
       out.write(<<-EOF)
-#{k.ocaml_native(@native)}: #{v.ocaml_native(@native).join(' ')}
+#{k}: #{v.join(' ')}
 #{@cmds.map {|v| "\t#{v}"}.join("\n")}
       EOF
     }
   end
+end
+
+
+# A directory task, like My_FileTask, but no timestamp checking
+class My_DirTask < My_MakeFileTask
+  include Rake::DSL
+
+  # hash is target => deps
+  def initialize(hash, cmds)
+    @hash = hash.rewrite_deps
+    raise "unexpected" if @hash.keys.length > 1
+    @cmds = cmds
+    $tasks << self
+  end
+
+  def rake_task
+    Rake::DirTask.define_task @hash do
+      @cmds.each {|v| sh v}
+    end
+  end
+
 end
 
 # a File task. target is a file or directory
@@ -109,17 +345,21 @@ class My_FileTask < My_MakeFileTask
   include Rake::DSL
 
   # hash is target => deps
-  def initialize(native, hash, cmds)
-    @native = native
-    @hash = hash
+  def initialize(hash, cmds)
+    hash.values.flatten(1).map {|v| v.assert_not_null}
+    @hash = hash.rewrite_deps
+    raise "unexpected" if @hash.keys.length > 1
     @cmds = cmds
     $tasks << self
   end
 
   def rake_task
-    my_multifile @native, @hash do
+    my_multifile @hash.rewrite_deps do
       @cmds.each {|v| sh v}
     end
+  rescue Exception => e
+    puts "for target #{@hash.keys}"
+    raise e
   end
 
 end
@@ -135,7 +375,7 @@ class My_Task < My_MakeFileTask
   end
 
   def rake_task
-    my_multitask @hash do
+    multitask @hash do
       @cmds.each {|v| sh v}
     end
   end
@@ -165,109 +405,198 @@ class My_CleanTask
   end
 end
 
-# module Rake
-#   class Task
-#     def multi
-#       self.instance_eval {
-#         def invoke_prerequisites(a,b)
-#           puts "HERE"
-#           invoke_prerequisites_concurrently(a,b)
-#         end
-#       }
-#     end
-#   end
-# end
+# this library {{{2
 
-class MultiFile < Rake::FileTask
-  private
-  # rake
-  # def invoke_prerequisites(task_args, invocation_chain) # :nodoc:
-  #   invoke_prerequisites_concurrently(task_args, invocation_chain)
-  # end
 
-  # drake:
-  def invoke_prerequisites(args, invocation_chain)
-    threads = @prerequisites.collect { |p|
-      Thread.new(p) { |r| application[r, @scope].invoke_with_call_chain(args, invocation_chain) }
+
+# ocaml buildable targets:
+# executable
+# library
+class OcamlBuildable
+
+  attr_reader :o
+  def initialize(o)
+    @o = o
+    cc = @o[:compiler]
+
+    @o[:base_dir].assert_not_null
+    # executable name or library without extension
+    if @o[:type] == :ocaml_library
+      @o[:target_rel] = @o[:target_rel].gsub(/\LIB_EXT$/, cc.lib_ext)
+    end
+    @o[:target_absolute] = File.join(@o[:base_dir], @o[:target_rel])
+
+    # either paths, or things responding to ocaml_link_flags(compiler), ocaml_cflags
+    @o[:depends_on] ||= []
+
+    @o[:files].keys.to_a.each {|file|
+      file_o = @o[:files][file]
+      if @o.fetch(:mlis, false) || file_o.fetch(:mli, false)
+        @o[:files]["#{file}i"] = file_o.clone
+        file_o[:ml_deps] = ["#{file}i"]
+      end
     }
-    threads.each { |t| t.join }
+
+    # name => { options }
+    # keys for options:
+    #  :ml_deps: name of .ml files (same :base_dir)
+    #  :depends_on (see above)
+    @o[:files].each_pair {|file, file_o|
+      file_o[:ml_deps] ||= {}
+    }
+
+    # optional, something like {"foo.ml" :=>  %w{bar.ml moon.ml}}
+    @o[:ml_deps] ||= Hash.new
+
+    @o[:patches] ||= []
+
+    @o[:annot] ||= true      # -dtypes option
+    @o[:bin_annot] ||= false # -bin-annot option
+    @o[:debug] ||= true # -g option
   end
 
-end
+  def prepare
+    begin
+      o =  Marshal.load( Marshal.dump(@o) )
+      compiler = o[:compiler]
+      @o[:patches].each {|v|
+        v.patch_ocaml_buildable_options o
+      }
 
-def my_multifile(native, hash = {}, *args, &block)
-    native.assert_ocaml_native()
-    # file(*args, &block)
-    MultiFile.define_task(hash.ocaml_native(native), *args, &block)
-end
+      # set :absolute_path for each file
+      o[:files].each_pair {|k,v| o[:files][k][:absolute_path] = File.join(o[:base_dir], k) }
 
-def my_multitask(hash = {}, *args, &block)
-    multitask(hash, *args, &block)
-end
+      # sort files by dependency order
+      x = Hash[o[:files].map {|k, v| [k, v[:ml_deps]]}].to_adjecent
+      dg = RGL::DirectedAdjacencyGraph[*x]
 
-def system_raise(cmd)
-  system(cmd)
-  raise "#{cmd} failed" if $? != 0
-end
+      # cycles? not supported yet. Must be all passed to one ocaml(c/opt)
+      # command?
+      comp_map = dg.strongly_connected_components.comp_map
+      raise "cycles detected ! #{comp_map} " if comp_map.values.count_unique_items.select {|k,v| v > 1}.size > 0
 
-$deps_hash = Hash.new
-class Ml
-  attr_accessor :extra_flags, :cmx_deps_no_ext
+      # now use topsort without missing items ..
+      sorted = dg.topsort_iterator.to_a
 
-  def initialize(name, cmx_deps_no_ext)
-    @name = name
-    @cmx_deps_no_ext = cmx_deps_no_ext
-    @includes = %w{libs/extlib libs/extc libs/neko libs/javalib libs/ziplib libs/swflib libs/xml-light libs/ttflib}
-    @extra_includes = []
-    @other_deps = []
-
-    @depends_on_libraries = []
-    $deps_hash[@name] = self
-
-    deriving_support if /deriving.*Show|Show.show</.match(open("#{name}.ml").read)
-
+      # files could have been dropped by patchers, only the :files array is valid
+      files = o[:files].keys
+      files_without_dependency_info = (files - sorted)
+      o[:files_sorted] = sorted.reverse + (files - sorted)
+      o
+    rescue Exception => e
+      puts "while preparing #{@o[:target]}"
+      raise e
+    end
   end
 
-  def depend_on_lib(*args)
-    @depends_on_libraries += args
+  def tasks
+    o = prepare
+    cc = o[:compiler]
+
+    annot_flags = (o[:annot] ? " -annot" : "") \
+        + (o[:bin_annot] ? " -bin-annot" : "") \
+        + (o[:debug] ? " -g" : "")
+
+    target_depends_on = []
+    mls_for_target = []
+    # ml file tasks, .o tasks
+    o[:files].each_pair {|file, file_o|
+      depends_on = file_o.fetch(:depends_on, [])
+      file_o[:out_rel] = cc.ml_mod_ext(file).gsub(/\.c$/,'.o')
+      file_o[:out_absolute] = File.join(o[:base_dir], file_o[:out_rel])
+
+      target_depends_on += depends_on
+
+      depends_on += o[:depends_on]
+
+      cppo_dep = []
+
+      cppo_executable_fun = lambda {
+        cppo_dep = ["cppo/cppo"]
+        File.absolute_path("cppo/cppo")
+      }
+
+      case file
+      when /\.ml$/
+        ml_deps = (o[:files_sorted] && file_o[:ml_deps]).map {|v| File.join(o[:base_dir], cc.ml_mod_ext(v) ) }
+        cmd = "cd #{o[:base_dir]}; #{cc.cc_compile({:cppo_executable_fun => cppo_executable_fun,:out => file_o[:out_rel], :depends_on => depends_on, :in => file}, o, file_o)}"
+        My_FileTask.new({file_o[:out_absolute] => cppo_dep + [file_o[:absolute_path]] + ml_deps + depends_on + o[:depends_on]}, [cmd])
+        mls_for_target << file
+      when /\.mli$/
+        ml_deps = (o[:files_sorted] && file_o[:ml_deps]).map {|v| File.join(o[:base_dir], cc.ml_mod_ext(v) ) }
+        cmd = "cd #{o[:base_dir]}; #{cc.cc_compile({:cppo_executable_fun => cppo_executable_fun, :out => file_o[:out_rel], :depends_on => depends_on, :in => file}, o, file_o)}"
+        My_FileTask.new({file_o[:out_absolute] => cppo_dep + [File.join("./", file_o[:absolute_path])] + ml_deps + depends_on + o[:depends_on]}, [cmd])
+      when /\.c$/
+        cmd = "cd #{o[:base_dir]}; ocamlc #{file_o.fetch(:CFLAGS, []).join(' ')} #{file}"
+        My_FileTask.new({file_o[:out_absolute].gsub(/\.c$/, '.o') => [file_o[:absolute_path]] + o[:depends_on]}, [cmd])
+      else
+        raise "unexpected #{file.inspect}"
+      end
+    }
+
+    target_depends_on += o[:depends_on]
+
+    # main executable or library task?
+    out_rel = o[:target_rel]
+    out_absolute = File.join( o[:base_dir], out_rel)
+
+    case o[:type]
+    when :ocaml_executable; 
+      opts = {
+        :action => :link_executable,
+        :out => out_rel,
+        :dependencies => (target_depends_on.uniq.map {|v| v.ocaml_link_flags }.flatten(1)) \
+                         +  (o[:files_sorted].select {|v| not v =~ /\.(c|mli)$/}).map {|v| cc.ml_mod_ext(v) }
+      }
+    when :ocaml_library; 
+      opts = {
+        :action => :link_lib,
+        :out => out_rel,
+        :dependencies => (o[:files_sorted].select {|v| not v =~ /\.(c|mli)$/}).map {|v| cc.ml_mod_ext(v) }
+      }
+    end
+    cmd = "cd #{o[:base_dir]}; #{cc.cc_link(opts, o)}"
+    My_FileTask.new({out_absolute => target_depends_on + o[:files].map {|k,v| v[:out_absolute]}}, [cmd])
+
+    if not @o[:alias_for_main_task].nil?
+      My_Task.new({@o[:alias_for_main_task] => [out_absolute]}, [])
+      if not $tasks.include? "clean_#{@o[:alias_for_main_task]}"
+        My_CleanTask.new("clean_#{@o[:alias_for_main_task]}", o[:base_dir])
+        My_CleanTask.new("clean_libs", o[:base_dir])
+      end
+    end
     self
   end
 
-  def link_name
-    "#{@name}.CEXT"
-  end
-
-  def deriving_support
-    return unless DERIVING_SUPPORT
-    # for deriving:
-    @extra_includes += ["#{DERIVING_PATH}/lib", "#{DERIVING_PATH}/syntax"]
-    @extra_deps = "nums.LEXT #{DERIVING_PATH}/lib/show.CEXT"
-    @deriving = "-pp #{DERIVING_PATH}/syntax/deriving"
-  end
-
-  def cppo
-    @cflags_backend = "-pp \"#{CPPO_PATH} #{CFLAGS_BACKEND.join(' ')}\""
-    @other_deps << "cppo/cppo" if CPPO_PATH =="cppo/cppo"
-  end
-
-  def cmx_dependencies
-    cmx_deps_no_ext.map {|v| "#{v}.CEXT"}
-  end
-
-  def compile_cmd(native)
-    includes = (INCLUDES + (@extra_includes || [])).map {|v| "-I #{v}"}.join(" ")
-    "OCAML #{DEBUGGING_SUPPORT} #{ANNOT} #{@cflags_backend} #{@deriving} #{@extra_flags} #{includes} #{@extra_deps} -c #{@name}.ml".ocaml_native(native)
-  end
-
-  def tasks(native)
-    lib_deps = @depends_on_libraries.map {|v| $libs[v].main_target }
-    My_FileTask.new(native, {"#{@name}.CEXT" => (["#{@name}.ml"] + cmx_dependencies + lib_deps + @other_deps)}, [compile_cmd(native)])
+  def main_target
+    @o[:target_absolute]
   end
 end
 
-# implementation start {{{1
-# =====================
+class OcamlLib < OcamlBuildable
+  def initialize(opts)
+    opts[:type] = :ocaml_library
+    super(opts)
+  end
+  def to_s
+    "#<#{self.class.name}:#{object_id} #{@o[:target_rel]}>"
+  end
+  def ocaml_cflags
+    ["-I", File.absolute_path(@o[:base_dir])]
+  end
+  def ocaml_link_flags
+    ocaml_cflags + [File.basename(main_target)] + o.fetch(:propagate_link_flags, [])
+  end
+end
 
+class OcamlExecutable < OcamlBuildable
+  def initialize(opts)
+    opts[:type] = :ocaml_executable
+    super(opts)
+  end
+end
+
+# this project {{{2
 
 $repositories = Hash.new
 class Repository
@@ -298,7 +627,7 @@ class Repository
     self
   end
 
-  def tasks(native)
+  def tasks
     # check out
     cmds = []
     case @repo[:type]
@@ -309,19 +638,19 @@ class Repository
         cmds << "git clone #{@repo[:url]} #{@path}"
       else raise "not implemented #{@repo[:type]}"
       end
-    My_FileTask.new(native, "#{@path}", cmds)
+    My_DirTask.new({"#{@path}" => []}, cmds)
 
     # compile etc
     @extra_targets.each {|v|
-      My_FileTask.new(native, { "#{v[:files][0]}" => ["#{@path}"] + v[:depends_on_targets] }, v[:cmd].ocaml_native(native))
+      My_FileTask.new({ "#{v[:files][0]}" => ["./#{@path}"] + v[:depends_on_targets] }, v[:cmd])
 
       v[:files].drop(1).each {|file|
         # alias targets
-        My_FileTask.new .call(native, { file => v[:files][0] }, [])
+        My_FileTask.new .call({ file => v[:files][0] }, [])
       }
     }
     if @clean_command
-      My_FileTask.new(native, "clean_#{@path}", @clean_command)
+      My_FileTask.new({"clean_#{@path}" => []}, @clean_command)
     end
   end
 end
@@ -336,196 +665,129 @@ Repository.new("deriving", {:url => "git://github.com/jaked/deriving.git"}, Dir[
           .clean_command(["make -C deriving clean"])
 
 Repository.new('extunix', {:url => 'https://forge.ocamlcore.org/frs/download.php/1146/ocaml-extunix-0.0.6.tar.gz', :type => :tar_gz, :rename => ['ocaml-extunix-0.0.6', 'extunix']} )
-          .add_target(["extunix/_build/src/extunix.cmxa"], ["cd extunix; ./configure && make"]) \
+          .add_target(["extunix/_build/src/extunix.LEXT"], ["cd extunix; ./configure && make"]) \
 
 
-# getting ml file dependencies from official Makefile - yes this sucks - but is likely to work:
-
-File.open("Makefile","r").each_line {|line|
-  case line
-  when /([^.]*)\.cmx: (.*)/
-    name = $1
-    deps = $2.split(" ").map {|v| v.gsub(/.cmx$/, '')}
-    $deps_hash[name] = Ml.new(name, deps)
-  end
-}
-
-$deps_hash["ast"] = Ml.new("ast", []).depend_on_lib(:extlib)
-$deps_hash["common"].depend_on_lib(:swflib) if ACTIVE_BACKENDS.include? :swf
-$deps_hash["common"].depend_on_lib(:javalib) if ACTIVE_BACKENDS.include? :java
-$deps_hash["common"].depend_on_lib(:extc)
-$deps_hash["genswf"].depend_on_lib(:ttflib)
-$deps_hash["codegen"].depend_on_lib("xml-light".to_sym)
-
-$deps_hash["parser"] = Ml.new("parser", %w{lexer common ast})
-$deps_hash["parser"].extra_flags = "-pp camlp4o"
-$deps_hash["genneko"].depend_on_lib(:neko)
-
-
-# which modules use deriving?
-# %w{ast}.each {|v| $deps_hash[v].deriving_support }
-
-backend_files = Hash.new
-backend_files[:swf] = %w{genswf8 genswf9 genswf}
-backend_files[:neko] = %w{genneko}
-backend_files[:as3] = %w{genas3}
-backend_files[:cpp] = %w{gencpp}
-backend_files[:cs] = %w{gencs}
-backend_files[:java] = %w{genjava}
-backend_files[:js] = %w{genjs}
-backend_files[:php] = %w{genphp}
-
-raise "something went wrong" if Set[*ALL_BACKENDS] != Set[*backend_files.keys]
-bad_backends = ACTIVE_BACKENDS - ALL_BACKENDS
-raise "bad backends #{bad_backends}" if bad_backends.length > 0
-
-$libs = Hash.new
-
-# lib controlled by rake
-class Lib
-
-  def initialize(path, name, files)
-    @path = path
-    @name = name
-
-    files.keys.to_a.each {|k|
-      files[k] ||= {}
-      v = files[k]
-      v[:goal] = case k
-      when /(.*)\.c$/; "#{$1}.o"
-      when /(.*)\.ml$/; "#{$1}.CEXT"
-      else; raise "TODO #{k}"
-      end
-    }
-
-    @files = files
-    @needs = []
-    $libs[@path.to_sym] = self
+class HaxeBackends
+  def initialize(active_backends)
+    @all_backends = ALL_BACKENDS
+    @active_backends = active_backends
   end
 
-  def main_target; "libs/#{@path}/#{@name}.LEXT"; end
-
-  def add_lib_dependencies(*args); @needs += args; self end
-
-  def clean_task; "clean_#{@path}"; end
-
-  def tasks(native)
-    My_CleanTask.new(clean_task, "libs/#{@path}")
-    lib_name = "#{@name}.LEXT"
-    all_deps = []
-
-    # file tasks
-    file_goals = []
-    @files.each {|k,v|
-      file_deps = v[:deps] || [] 
-      goal = "libs/#{@path}/#{v[:goal]}"
-      file_goals << goal
-      all_deps += [ lib_name, k ]
-      file_deps.each {|d| all_deps += [ k, d ] }
-
-      cmds = []
-      ocaml_includes = @needs.map {|v| "-I ../#{v}"}
-      case k
-      when /\.c$/
-        cmds << "cd libs/#{@path}; ocamlc #{v[:CFLAGS]} extc_stubs.c".ocaml_native(native)
-      when /\.ml$/
-        cmds << "cd libs/#{@path}; OCAML #{v[:CFLAGS]} #{ocaml_includes.join(' ')} -c #{k}i".ocaml_native(native) if File.exist? "libs/#{@path}/#{k}i"
-        cmds << "cd libs/#{@path}; OCAML #{v[:CFLAGS]} #{ocaml_includes.join(' ')} -c #{k}".ocaml_native(native)
-      else; raise "TODO #{k}"
+  def patch_ocaml_buildable_options(o)
+    files = o[:files]
+    files_to_delete = []
+    @all_backends.each {|backend|
+      if not @active_backends.include? backend
+        BACKEND_FILES[backend].each {|file| 
+          files_to_delete << file
+          files.delete file
+        }
       end
-      My_FileTask.new(native,  {goal => ["libs"] + @needs.map {|lib_name| $libs[lib_name].main_target } + (file_deps).map {|d| "libs/#{@path}/#{@files[d][:goal]}"} }, cmds)
     }
-    # create library task
-
-    dg = RGL::DirectedAdjacencyGraph.__send__(:[], *all_deps)
-    lib_deps = []
-    dg.depth_first_visit(lib_name) {|n|
-      lib_deps << @files[n][:goal] unless n == lib_name || @files[n][:goal] =~ /\.o$/
-    } 
-
-    My_FileTask.new(native, {"#{main_target}" => file_goals },
-    ["cd libs/#{@path}; OCAML -a -o #{lib_name} #{lib_deps.join(' ')}".ocaml_native(native)])
-
-    My_Task.new({:compile_libs => [main_target]}, [])
-    My_Task.new({@path.to_sym => [main_target]}, [])
+    files.each_pair {|k,v|
+      v[:ml_deps] ||= []
+      v[:ml_deps].select! {|v| not files_to_delete.include? v}
+    }
+    cppo_flags = @active_backends.map {|v| "-D BACKEND_#{v}"}
+    %w{common.ml interp.ml main.ml gencommon.ml typer.ml}.each {|v| 
+      files[v][:cppo_flags] = cppo_flags
+    }
   end
 end
 
-# lib still controlled by make
-class LibMake
 
-  attr_reader :name, :targets, :needs
-  def initialize(name, targets)
-    @name = name
-    @make_args = []
-    @targets = targets
-    @needs = []
-    $libs[name] = self
-  end
+# haxe executable {{{3
 
-  def add_make_args(*args); @make_args += args; self end
-  def add_lib_dependencies(*args); @needs += args; self end
+$repositories.each_pair {|k,r| r.tasks }
 
-  def main_target; @main_target ||= "libs/#{@name}/#{@targets[0]}"; @main_target end
-  def prerequisites; @needs.map {|v| $libs[v].main_target } end
+[Ocamlopt.new, OcamlC.new] .each do |compiler|
 
-  def tasks(native)
-    My_Task.new(clean_task, [ "make -C libs/#{@name} clean"])
+libs = Hash.new
+$libs = libs
+def l(*args); $libs.values_at(*args); end
 
-    make_args = @make_args.map {|v| " #{v}"}.join('')
-    My_FileTask.new(native, {"#{main_target}" => ["libs"] + prerequisites}, ["make -C libs/#{@name} #{native == "native" ? "native" : "bytecode"}"])
+# TODO dependencies
+libs[:extlib] = OcamlLib.new({
+  :base_dir => 'libs/extlib',
+  :target_rel => 'extLib.LIB_EXT',
+  :compiler => compiler,
+  :alias_for_main_task => 'extlib',
+  :mlis => true,
+  :propagate_link_flags => ["-cclib", "libs/extc/extc_stubs.o", '-cclib', '-lz' ],
+  :files => {
+    "enum.ml" => {},
+    "bitSet.ml" => {:ml_deps => %w{enum.ml}},
+    "dynArray.ml" => {:ml_deps => %w{enum.ml}},
+    "extArray.ml" => {:ml_deps => %w{enum.ml bitSet.ml}},
+    "extHashtbl.ml" => {:ml_deps => %w{enum.ml}},
+    "extList.ml" => {:ml_deps => %w{enum.ml}},
+    "extString.ml" => {:ml_deps => %w{enum.ml}},
+    "global.ml" => {},
+    "IO.ml" => {:ml_deps => %w{extString.ml}},
+    "option.ml" => {},
+    "pMap.ml" => {:ml_deps => %w{enum.ml}},
+    "std.ml" => {:ml_deps => %w{enum.ml}},
+    "uChar.ml" => {},
+    "uTF8.ml" => {:ml_deps => %w{uChar.ml}},
+    "base64.ml" => {:ml_deps => %w{IO.ml}},
+    "unzip.ml" => {:ml_deps => %w{IO.ml}},
+    "refList.ml" => {:ml_deps => %w{extList.ml}},
+    "optParse.ml" => {:ml_deps => %w{extString.ml extList.ml}},
+    "dllist.ml" => {:ml_deps => %w{enum.ml}},
+    "multiArray.ml" => {}
+  }
+})
 
-    # for each alternative target create a new task:
-    # targets.drop(1).each do |t|
-    #   my_multifile "libs/#{@name}/#{t}" => lib.main_target
-    # end
+libs[:extc] = OcamlLib.new({
+  :base_dir => 'libs/extc',
+  :compiler => compiler,
+  :target_rel => 'extc.LIB_EXT',
+  :alias_for_main_task => 'extc',
+  :files => {
+    "extc.ml" => {},
+    "extc_stubs.c" => {:CFLAGS => %w{-I zlib}}
+  }
+})
+libs[:neko] = OcamlLib.new({
+  :base_dir => "libs/neko",
+  :compiler => compiler,
+  :target_rel => "neko.LIB_EXT",
+  :alias_for_main_task => 'neko',
+  :files => {
+    "nast.ml" => {},
+    "nxml.ml" => {:ml_deps => %w{nast.ml}},
+    "binast.ml" => {:ml_deps => %w{nast.ml}},
+    "nbytecode.ml" => {},
+    "ncompile.ml" => {:ml_deps => %w{nbytecode.ml}},
+  }
+})
+libs[:javalib] = LibMake.new({
+  :base_dir => "libs/javalib",
+  :compiler => compiler,
+  :target_rel => "java.LIB_EXT",
+  :alias_for_main_task => 'javalib'
+})
+libs[:ziplib] = LibMake.new({
+  :base_dir => "libs/ziplib",
+  :compiler => compiler,
+  :target_rel => "zip.LIB_EXT",
+  :alias_for_main_task => 'ziplib'
+})
+libs[:swflib] = LibMake.new({
+  :base_dir => "libs/swflib",
+  :compiler => compiler,
+  :target_rel =>  "swflib.LIB_EXT",
+  :alias_for_main_task => 'swflib'
+})
 
-    My_Task.new({:compile_libs => [main_target]}, [])
-    My_Task.new({name.to_sym => [main_target]}, [])
-  end
-
-  def clean_task; "clean_#{@name}"; end
-end
-deps_enum = {:deps => %w{enum.ml}}
-Lib.new("extlib", "extLib", {
-    "enum.ml" => nil,
-    "bitSet.ml" => {:deps => %w{enum.ml}},
-    "dynArray.ml" => {:deps => %w{enum.ml}},
-    "extArray.ml" => {:deps => %w{enum.ml bitSet.ml}},
-    "extHashtbl.ml" => {:deps => %w{enum.ml}},
-    "extList.ml" => {:deps => %w{enum.ml}},
-    "extString.ml" => {:deps => %w{enum.ml}},
-    "global.ml" => nil,
-    "IO.ml" => {:deps => %w{extString.ml}},
-    "option.ml" => nil,
-    "pMap.ml" => {:deps => %w{enum.ml}},
-    "std.ml" => {:deps => %w{enum.ml}},
-    "uChar.ml" => nil,
-    "uTF8.ml" => {:deps => %w{uChar.ml}},
-    "base64.ml" => {:deps => %w{IO.ml}},
-    "unzip.ml" => {:deps => %w{IO.ml}},
-    "refList.ml" => {:deps => %w{extList.ml}},
-    "optParse.ml" => {:deps => %w{extString.ml extList.ml}},
-    "dllist.ml" => {:deps => %w{enum.ml}},
-    "multiArray.ml" => nil })
-
-Lib.new("extc", "extc", {
-          "extc.ml" => nil,
-          "extc_stubs.c" => {:CFLAGS => "-I zlib"}
-        }) \
-    .add_lib_dependencies(:extlib)
-Lib.new("neko", "neko", {
-          "nast.ml" => nil,
-          "nxml.ml" => {:deps => %w{nast.ml}},
-          "binast.ml" => {:deps => %w{nast.ml}},
-          "nbytecode.ml" => nil,
-          "ncompile.ml" => {:deps => %w{nbytecode.ml}},
-        }).add_lib_dependencies(:extlib)
-
-LibMake.new(:javalib, ["java.LEXT"]).add_lib_dependencies(:extlib)
-LibMake.new(:ziplib, ["zip.LEXT"]).add_lib_dependencies(:extc)
-LibMake.new(:swflib, ["swflib.LEXT"]).add_lib_dependencies(:extlib, :extc)
-LibMake.new("xml-light".to_sym, ["xml-light.LEXT"]).add_make_args("xml-light.LEXT")
+libs[:xml_light] = LibMake.new({
+    :base_dir => "libs/xml-light", 
+    :compiler => compiler,
+    :target_rel => "xml-light.LIB_EXT", 
+    :alias_for_main_task => 'xml-light',
+    :make_args_by_compiler => {"ocamlopt" => "xml-light.cmxa", "ocamlc" => "xml-light.cma"}
+})
 # circular dependencies, there is not much you could optimize ..
 # Lib.new("xml-light", "xml-light", {
 #           "xml_lexer.ml" => {:deps => %w{xmlParser.ml}},
@@ -533,170 +795,81 @@ LibMake.new("xml-light".to_sym, ["xml-light.LEXT"]).add_make_args("xml-light.LEX
 #           "xmlParser.ml" => {:deps => %w{dtd.ml}},
 #           "xml.ml" => {:deps => %w{}},
 #         })
-LibMake.new(:ttflib, ["ttf.LEXT"]).add_lib_dependencies(:swflib, :extlib)
+libs[:ttflib] = LibMake.new({
+  :base_dir => "libs/ttflib", 
+  :compiler => compiler,
+  :alias_for_main_task => 'ttflib',
+  :target_rel => "ttf.LIB_EXT"
+})
 
-# drop unused files:
-backend_files.each_pair do |k,v|
-  if (ACTIVE_BACKENDS.include? k)
-    CFLAGS_BACKEND << "-D BACKEND_#{k}"
-  else
-    v.each do |file_to_delete|
-      $deps_hash.delete file_to_delete
-      $deps_hash.each_pair {|k,ml| ml.cmx_deps_no_ext = ml.cmx_deps_no_ext.select {|file| file != file_to_delete }}
-    end
-  end
-end
+libs[:extc].o[:depends_on] << libs[:extlib]
+libs[:neko].o[:depends_on] << libs[:extlib]
+libs[:javalib].o[:depends_on] << libs[:extlib]
+libs[:ziplib].o[:depends_on] << libs[:extc]
+libs[:swflib].o[:depends_on] += [libs[:extlib], libs[:extc]]
+libs[:ttflib].o[:depends_on] += [libs[:swflib], libs[:extlib]]
 
-# which modules require cppo?
-%w{common interp main gencommon typer}.each {|v| $deps_hash[v].cppo }
+  # getting ml file dependencies from official Makefile - yes this sucks - but is likely to work:
 
-deps = []
-$deps_hash.each_pair {|k,ml| ml.cmx_deps_no_ext.each {|dep| deps << k; deps << dep } }
-dg = RGL::DirectedAdjacencyGraph.__send__(:[], *deps )
+  files = {
+    "ast.ml" => {:depends_on => l(:extlib)},
+    "codegen.ml"=>{:ml_deps=>["optimizer.ml", "typeload.ml", "typecore.ml", "type.ml", "genxml.ml", "common.ml", "ast.ml"], :depends_on => l(:xml_light, :extlib)},
+    "common.ml"=>{:ml_deps=>["type.ml", "ast.ml"], :depends_on => l(:extc, :extlib)},
+    "dce.ml"=>{:ml_deps=>["ast.ml", "common.ml", "type.ml"], :depends_on => l(:extlib)},
+    "genas3.ml"=>{:ml_deps=>["type.ml", "common.ml", "codegen.ml", "ast.ml"]},
+    "gencommon.ml"=>{:ml_deps=>["type.ml", "common.ml", "codegen.ml", "ast.ml"], :depends_on => l(:extlib)},
+    "gencpp.ml"=>{:ml_deps=>["type.ml", "lexer.ml", "common.ml", "codegen.ml", "ast.ml"]},
+    "gencs.ml"=>{:ml_deps=>["type.ml", "lexer.ml", "gencommon.ml", "common.ml", "codegen.ml", "ast.ml"]},
+    "genjava.ml"=>{:ml_deps=>["type.ml", "gencommon.ml", "common.ml", "codegen.ml", "ast.ml"]},
+    "genjs.ml"=>{:ml_deps=>["type.ml", "optimizer.ml", "lexer.ml", "common.ml", "codegen.ml", "ast.ml"]},
+    "genneko.ml"=>{:ml_deps=>["type.ml", "lexer.ml", "common.ml", "codegen.ml", "ast.ml"], :depends_on => l(:neko, :extlib)},
+    "genphp.ml"=>{:ml_deps=>["type.ml", "lexer.ml", "common.ml", "codegen.ml", "ast.ml"]},
+    "genswf.ml"=>{:ml_deps=>["type.ml", "genswf9.ml", "genswf8.ml", "common.ml", "ast.ml"]},
+    "genswf8.ml"=>{:ml_deps=>["type.ml", "lexer.ml", "common.ml", "codegen.ml", "ast.ml"]},
+    "genswf9.ml"=>{:ml_deps=>["type.ml", "lexer.ml", "genswf8.ml", "common.ml", "codegen.ml", "ast.ml"]},
+    "genxml.ml"=>{:ml_deps=>["type.ml", "lexer.ml", "common.ml", "ast.ml"], :depends_on => l(:extlib)},
+    "interp.ml"=>{:ml_deps=>["typecore.ml", "type.ml", "lexer.ml", "genneko.ml", "common.ml", "codegen.ml", "ast.ml", "genswf.ml", "parser.ml"], :depends_on => l(:extlib, :extc, :xml_light)},
+    "matcher.ml"=>{:ml_deps=>["optimizer.ml", "codegen.ml", "typecore.ml", "type.ml", "typer.ml", "common.ml", "ast.ml"], :depends_on => l(:extlib)},
+    "main.ml"=>{:ml_deps=>["dce.ml", "matcher.ml", "typer.ml", "typeload.ml", "typecore.ml", "type.ml", "parser.ml", "optimizer.ml", "lexer.ml", "interp.ml", "genxml.ml", "genswf.ml", "genphp.ml", "genneko.ml", "genjs.ml", "gencpp.ml", "genas3.ml", "common.ml", "codegen.ml", "ast.ml", "gencommon.ml", "genjava.ml", "gencs.ml"], :depends_on => l(:extlib, :extc)},
+    "optimizer.ml"=>{:ml_deps=>["typecore.ml", "type.ml", "parser.ml", "common.ml", "ast.ml"], :depends_on => l(:extlib)},
+    "parser.ml"=>{:ml_deps=>["lexer.ml", "common.ml", "ast.ml"], :depends_on => l(:extlib)},
 
-# rake tasks {{{1
-# ===============
+    "type.ml"=>{:ml_deps=>["ast.ml"], :depends_on => l(:extc, :extlib) },
+    "typecore.ml"=>{:ml_deps=>["type.ml", "common.ml", "ast.ml"], :depends_on =>l(:extlib) },
+    "typeload.ml"=>{:ml_deps=>["typecore.ml", "type.ml", "parser.ml", "optimizer.ml", "lexer.ml", "common.ml", "ast.ml"], :depends_on => l(:extlib)},
+    "typer.ml"=>{:ml_deps=>["typeload.ml", "typecore.ml", "type.ml", "parser.ml", "optimizer.ml", "lexer.ml", "interp.ml", "genneko.ml", "genjs.ml", "common.ml", "codegen.ml", "ast.ml"], :depends_on => l(:extlib)},
+    "lexer.ml"=>{:ml_deps=>["ast.ml"]}
 
-HELP_TEXT=<<-EOF
-usage:
-
-drake haxe.native
-drake haxe.bytecode
-
-drake haxe (will build both)
-
-useful targets for libs:
-========================
-drake clean_LIB (LIB like swflib)
-drake libs/swflib/swflib.cmxa
-
-drake clean_libs
-
-checking out
-=========================
-drake libs # gets libs
-drake cppo # gets cppo/
-drake derving # gets deriving
-
-
-# build deriving:
-drake deriving/syntax/deriving
-
-# build cppo:
-drake cppo/cppo
-
-
-
-info
-============================
-libs/*: some Makefiles are no longer used. See LibMake usage in Rakefile
-
-
-state
-============================
-If you change backends you have to drake haxe_clean, then recompile
-
-EOF
-
-task :help do
-  puts HELP_TEXT
-end
-
-# cleaning {{{2
-def delete_files(*files)
-  files.each {|v|
-    File.delete v if File.exist? v
   }
+
+  files["interp.ml"][:depends_on] += l(:neko) if ACTIVE_BACKENDS.include? :neko
+  files["common.ml"][:depends_on] += l(:swflib) if ACTIVE_BACKENDS.include? :swf
+  files["common.ml"][:depends_on] += l(:javalib) if ACTIVE_BACKENDS.include? :java
+  files["genswf.ml"][:depends_on] = l(:ttflib)
+
+  files["parser.ml"][:camlp4] = 'camlp4o'
+
+  # create rake tasks:
+  libs.each_pair {|k, v| v.tasks }
+
+  haxe = OcamlExecutable.new({
+    :alias_for_main_task => "haxe#{compiler.exe_suffix}",
+    :patches => [HaxeBackends.new(ACTIVE_BACKENDS)],
+    :base_dir => "./",
+    :target_rel => "haxe#{compiler.exe_suffix}",
+    :files => files,
+    :compiler => compiler,
+    :depends_on => l(:extc) + [OcamlLinkFlags.new(
+      "unix.#{compiler.lib_ext}",
+      "str.#{compiler.lib_ext}"
+    )]
+  }).tasks
+
 end
-
-def clean_dir(path)
-  files = Dir.__send__(:[], *EXTS_TO_CLEAN.map {|v| "#{path}/#{v}" })
-  puts "cleaning #{files}"
-  delete_files(*files)
-end
-
-task :clean do
-  # should this clean everything?
-  raise "there is no :clean target. Try clean_haxe, clean_libs, clean_all"
-end
-
-My_CleanTask.new(:clean_haxe, "./", ["haxe.native", "haxe.bytecode"])
-
-task :clean_graph do
-  delete_files("graph.jpg","graph.dot")
-end
-
-My_Task.new({:clean_all => [:clean_haxe, :clean_libs, :clean_graph]}, [])
-
-# dependency graph of ./*.ml files: {{{2
-
-file "graph.jpg" do
-  # Use DOT to visualize this graph:
-  require 'rgl/dot'
-  dg.write_to_graphic_file('jpg')
-end
-
-# haxe and its files {{{2
-
-# rake targets {{{3
-
-
-My_Task.new({:default => [:help] }, [])
-
-
-# cleaning:
-My_Task.new({:clean_libs => $libs.map {|k,v| v.clean_task}}, [])
-
-# building
-ACTIVE_FLAVOURS.each do |flavour|
-  native = flavour.clone
-  $repositories.each_pair {|k,r| r.tasks(flavour) }
-  $deps_hash.each_pair {|k,ml| ml.tasks(flavour) }
-  $libs.each_pair {|k,v| v.tasks(flavour) }
-
-  # haxe target
-  haxe_local_deps = []
-  require "rgl/traversal"
-  dg.depth_first_visit("main") {|n|
-    haxe_local_deps << "#{$deps_hash[n].link_name}"
-  }
-  haxe_local_deps
-
-  libs_deps = [:extc, :ziplib]
-  libs_deps << :ttflib if ACTIVE_BACKENDS.include? :swf
-
-  libs_deps.map! {|v| $libs[v].main_target }
-  haxe_goal = "haxe.#{native}"
-
-  # TODO
-  libs = []
-  libs << "-cclib"
-  libs << "libs/extc/extc_stubs.o"
-  libs << "-cclib"
-  libs << "-lz"
-  libs << "unix.LEXT"
-  libs << "str.LEXT"
-  libs << "libs/extlib/extLib.LEXT"
-  libs << "libs/xml-light/xml-light.LEXT"
-  libs << "libs/swflib/swflib.LEXT" if ACTIVE_BACKENDS.include? :swf
-  libs << "libs/extc/extc.LEXT"
-  libs << "libs/neko/neko.LEXT"
-  libs << "libs/javalib/java.LEXT" if ACTIVE_BACKENDS.include? :java
-  libs << "libs/ziplib/zip.LEXT" if ACTIVE_BACKENDS.include? :java or ACTIVE_BACKENDS.include? :swf
-  libs << "libs/ttflib/ttf.LEXT" if ACTIVE_BACKENDS.include? :swf
-  if DERIVING_SUPPORT
-    libs << ["-I #{DERIVING_PATH}/lib", " -I #{DERIVING_PATH}/syntax"]
-    libs << ["nums.LEXT", "show.CEXT"]
-  end
-
-  My_FileTask.new(native, {haxe_goal => ["libs/"] + haxe_local_deps + libs_deps},
-    [ "OCAML #{DEBUGGING_SUPPORT} #{native == "native" ? "" : "-custom"} #{libs.join(' ')} -o #{haxe_goal} #{haxe_local_deps.join(' ')}".ocaml_native(native) ]
-  )
-end
-
-My_Task.new({ :haxe => ACTIVE_FLAVOURS.map {|v| "haxe.#{v}"} }, [])
 
 $tasks.each {|v| v.rake_task }
+
+# makefile rake task {{{ 1
 
 class MakefileWriter
   def initialize()
@@ -714,7 +887,10 @@ class MakefileWriter
   end
 end
 
+
 task :makefile do
+  # currently broken
+  #
   out = MakefileWriter.new
 
   out.write(<<-EOF)
@@ -729,15 +905,15 @@ task :makefile do
   EOF
 
   out.write("# BACKEND_X=yes: comment to disable backend")
-  backend_files.each_pair {|k,v|
+  BACKEND_FILES.each_pair {|k,v|
     out.write("#{k == :neko ? "" : "# "}BACKEND_#{k}=yes")
   }
   out.write("")
 
   out.write("")
-  HELP_TEXT.split("\n").each {|v|
-    out.write("# #{v.gsub("drake", "make")}")
-  }
+  # HELP_TEXT.split("\n").each {|v|
+  #   out.write("# #{v.gsub("drake", "make")}")
+  # }
   out.write("")
 
 
@@ -745,7 +921,7 @@ task :makefile do
 
   makefile = out.string
 
-  backend_files.each_pair {|k,v|
+  BACKEND_FILES.each_pair {|k,v|
     makefile = makefile.gsub("-D BACKEND_#{k}", "$(if ${BACKEND_#{k}}, -D BACKEND_#{k},)")
 
     v.each {|file|
@@ -757,3 +933,5 @@ task :makefile do
 
   File.open('makefile-generated-by-rake', "wb") { |file| file.write(makefile) }
 end
+
+# vim: fdm=marker
