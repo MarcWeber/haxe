@@ -41,7 +41,7 @@ BACKEND_FILES[:php] = %w{genphp.ml}
 # ==========
 INCLUDES=%w{}
 CFLAGS_BACKEND = []
-EXTS_TO_CLEAN = ["*.cmx", "*.cmi", "*.cmo", "*.cma", "*.cmxa", "*.annot", "*.o","*.a"]
+EXTS_TO_CLEAN = ["*.cmx", "*.cmi", "*.cmo", "*.cma", "*.cmxa", "*.annot", "*.o","*.a", "*.cmt", "*.cmti"]
 
 def clean_dir(path)
   files = Dir.__send__(:[], *EXTS_TO_CLEAN.map {|v| "#{path}/#{v}" })
@@ -179,6 +179,7 @@ class LibMake
     # TODO refactor?, make it an configuration option
     My_Task.new({:compile_libs => [main_target]}, [])
     My_Task.new({@name.to_sym => [main_target]}, [])
+    My_Task.new({"clean_libs" => [clean_task]}, [])
     self
   end
 
@@ -192,7 +193,10 @@ class OcamlCC
     action = o.first(:action)
     out = o.first(:out)
 
-    libs_cflags = o.join_array(:depends_on).flatten(1).map{|v| v.ocaml_cflags}.join(' ')
+    libs_cflags = o.join_array(:depends_on).flatten(1).map{|v|
+      v.respond_to?(:ocaml_cflags) ?  v.ocaml_cflags : []
+    }.join(' ')
+    libs_cflags += o.join_array(:cflags).join(' ')
 
     cppo_executable_fun = o.first(:cppo_executable_fun)
 
@@ -206,7 +210,7 @@ class OcamlCC
     raise "multiple camlp4 suggestions #{camlp4_suggestions}" if camlp4_suggestions.length > 1
     camlp4 = camlp4_suggestions.first
 
-    includes     = o.join_array(:includes).map {|v| v.ocaml_cflags }.flatten(1)
+    includes     = o.join_array(:includes)
     dependencies = o.join_array(:dependencies).flatten(1)
 
     pre_flags = ""
@@ -217,8 +221,9 @@ class OcamlCC
       [ cc,
       libs_cflags,
       includes.map {|v| "-I #{v}"},
-      action != :link && use_cppo ? "-pp '#{cppo_executable_fun.call} #{cppo_flags.join(' ')}'" : "",
       action != :link && camlp4 ? "-pp '#{camlp4} #{camlp4_flags.join(' ')}'" : "",
+      # second -pp arg is executed first !
+      action != :link && use_cppo ? "-pp '#{cppo_executable_fun.call} #{cppo_flags.join(' ')}'" : "",
       dependencies,
       "-o #{o.first(:out)} -c #{o.first(:in)}"
       ]
@@ -431,6 +436,7 @@ class OcamlBuildable
 
     @o[:files].keys.to_a.each {|file|
       file_o = @o[:files][file]
+      file_o[:camlp4] = 'camlp4o'
       if @o.fetch(:mlis, false) || file_o.fetch(:mli, false)
         @o[:files]["#{file}i"] = file_o.clone
         file_o[:ml_deps] = ["#{file}i"]
@@ -496,6 +502,7 @@ class OcamlBuildable
     annot_flags = (o[:annot] ? " -annot" : "") \
         + (o[:bin_annot] ? " -bin-annot" : "") \
         + (o[:debug] ? " -g" : "")
+    annot = {:cflags => annot_flags}
 
     target_depends_on = []
     mls_for_target = []
@@ -515,11 +522,10 @@ class OcamlBuildable
         cppo_dep = ["cppo/cppo"]
         File.absolute_path("cppo/cppo")
       }
-
       case file
       when /\.ml$/
         ml_deps = (o[:files_sorted] && file_o[:ml_deps]).map {|v| File.join(o[:base_dir], cc.ml_mod_ext(v) ) }
-        cmd = "cd #{o[:base_dir]}; #{cc.cc_compile({:cppo_executable_fun => cppo_executable_fun,:out => file_o[:out_rel], :depends_on => depends_on, :in => file}, o, file_o)}"
+        cmd = "cd #{o[:base_dir]}; #{cc.cc_compile({:cppo_executable_fun => cppo_executable_fun,:out => file_o[:out_rel], :depends_on => depends_on, :in => file}, annot, o, file_o)}"
         My_FileTask.new({file_o[:out_absolute] => cppo_dep + [file_o[:absolute_path]] + ml_deps + depends_on + o[:depends_on]}, [cmd])
         mls_for_target << file
       when /\.mli$/
@@ -532,6 +538,36 @@ class OcamlBuildable
       else
         raise "unexpected #{file.inspect}"
       end
+
+
+      # case file
+      # when /\.ml$/
+      #   ml_deps = (o[:files_sorted] && file_o[:ml_deps]).map {|v| File.join(o[:base_dir], cc.ml_mod_ext(v) ) }
+      #   cmd = "#{cc.cc_compile({
+      #     :includes => o[:base_dir],
+      #     :cppo_executable_fun => cppo_executable_fun,
+      #     :out => "#{o[:base_dir]}/#{file_o[:out_rel]}", 
+      #     :depends_on => depends_on, 
+      #     :in => "#{o[:base_dir]}/#{file}"
+      #   }, annot, o, file_o)}"
+      #   My_FileTask.new({file_o[:out_absolute] => cppo_dep + [file_o[:absolute_path]] + ml_deps + depends_on + o[:depends_on]}, [cmd])
+      #   mls_for_target << file
+      # when /\.mli$/
+      #   ml_deps = (o[:files_sorted] && file_o[:ml_deps]).map {|v| File.join(o[:base_dir], cc.ml_mod_ext(v) ) }
+      #   cmd = "#{cc.cc_compile({:cppo_executable_fun => cppo_executable_fun,
+      #     :includes => o[:base_dir],
+      #     :out => "#{o[:base_dir]}/#{file_o[:out_rel]}",
+      #     :depends_on => depends_on,
+      #     :in => "#{o[:base_dir]}/#{file}"
+      #   },
+      #   o, file_o)}"
+      #   My_FileTask.new({file_o[:out_absolute] => cppo_dep + [File.join("./", file_o[:absolute_path])] + ml_deps + depends_on + o[:depends_on]}, [cmd])
+      # when /\.c$/
+      #   cmd = "cd #{o[:base_dir]}; ocamlc #{file_o.fetch(:CFLAGS, []).join(' ')} #{file}"
+      #   My_FileTask.new({file_o[:out_absolute].gsub(/\.c$/, '.o') => [file_o[:absolute_path]] + o[:depends_on]}, [cmd])
+      # else
+      #   raise "unexpected #{file.inspect}"
+      # end
     }
 
     target_depends_on += o[:depends_on]
@@ -545,7 +581,9 @@ class OcamlBuildable
       opts = {
         :action => :link_executable,
         :out => out_rel,
-        :dependencies => (target_depends_on.uniq.map {|v| v.ocaml_link_flags }.flatten(1)) \
+        :dependencies => (target_depends_on.uniq.map {|v|
+          v.respond_to?(:ocaml_link_flags) ?  v.ocaml_link_flags : []
+        }.flatten(1)) \
                          +  (o[:files_sorted].select {|v| not v =~ /\.(c|mli)$/}).map {|v| cc.ml_mod_ext(v) }
       }
     when :ocaml_library; 
@@ -698,14 +736,49 @@ end
 
 
 # haxe executable {{{3
+ENABLE_TRACING = true
+
+
+class Tracing
+  def patch_ocaml_buildable_options(o)
+    files = o[:files]
+    files.each_pair {|k,v|
+      v[:camlp4_flags] ||= []
+      v[:camlp4_flags] << File.absolute_path("trace/instr.cmo")
+      v[:depends_on] ||= []
+      v[:depends_on] << "trace/instr.cmo"
+    }
+  end
+end
+$tracing = [Tracing.new]
+
+
+%w{trace Camlp4Tracer instr}.each {|v|
+My_FileTask.new({"trace/#{v}.cmo" => ["trace/#{v}.ml"]},
+  [ "cd trace; ocamlc -dtypes -pp 'camlp4r -I +camlp4 -parser Camlp4QuotationCommon  -parser Camlp4QuotationExpander' -I +camlp4 -o #{v}.cma -c #{v}.ml" ])\
+  .rake_task
+}
+My_CleanTask.new("clean", "trace").rake_task
 
 $repositories.each_pair {|k,r| r.tasks }
 
 [Ocamlopt.new, OcamlC.new] .each do |compiler|
 
+  OcamlExecutable.new({
+    :alias_for_main_task => "tracetest",
+    :patches => $tracing,
+    :base_dir => "./",
+    :target_rel => "tracetest#{compiler.exe_suffix}",
+    :files => {"tracetest.ml" => {}},
+    :compiler => compiler,
+  }).tasks
+
+
 libs = Hash.new
 $libs = libs
 def l(*args); $libs.values_at(*args); end
+
+lib_tracing = $tracing
 
 # TODO dependencies
 libs[:extlib] = OcamlLib.new({
@@ -713,6 +786,7 @@ libs[:extlib] = OcamlLib.new({
   :target_rel => 'extLib.LIB_EXT',
   :compiler => compiler,
   :alias_for_main_task => 'extlib',
+  :patches => lib_tracing,
   :mlis => true,
   :propagate_link_flags => ["-cclib", "libs/extc/extc_stubs.o", '-cclib', '-lz' ],
   :files => {
@@ -744,8 +818,9 @@ libs[:extc] = OcamlLib.new({
   :compiler => compiler,
   :target_rel => 'extc.LIB_EXT',
   :alias_for_main_task => 'extc',
+  :patches => lib_tracing,
   :files => {
-    "extc.ml" => {},
+    "extc.ml" => {:depends_on => l(:extlib)},
     "extc_stubs.c" => {:CFLAGS => %w{-I zlib}}
   }
 })
@@ -754,6 +829,7 @@ libs[:neko] = OcamlLib.new({
   :compiler => compiler,
   :target_rel => "neko.LIB_EXT",
   :alias_for_main_task => 'neko',
+  :patches => lib_tracing,
   :files => {
     "nast.ml" => {},
     "nxml.ml" => {:ml_deps => %w{nast.ml}},
@@ -814,7 +890,7 @@ libs[:ttflib].o[:depends_on] += [libs[:swflib], libs[:extlib]]
   files = {
     "ast.ml" => {:depends_on => l(:extlib)},
     "codegen.ml"=>{:ml_deps=>["optimizer.ml", "typeload.ml", "typecore.ml", "type.ml", "genxml.ml", "common.ml", "ast.ml"], :depends_on => l(:xml_light, :extlib)},
-    "common.ml"=>{:ml_deps=>["type.ml", "ast.ml"], :depends_on => l(:extc, :extlib)},
+    "common.ml"=>{:ml_deps=>["type.ml", "ast.ml"], :depends_on => l(:extc, :extlib, :xml_light)},
     "dce.ml"=>{:ml_deps=>["ast.ml", "common.ml", "type.ml"], :depends_on => l(:extlib)},
     "genas3.ml"=>{:ml_deps=>["type.ml", "common.ml", "codegen.ml", "ast.ml"]},
     "gencommon.ml"=>{:ml_deps=>["type.ml", "common.ml", "codegen.ml", "ast.ml"], :depends_on => l(:extlib)},
@@ -854,7 +930,7 @@ libs[:ttflib].o[:depends_on] += [libs[:swflib], libs[:extlib]]
 
   haxe = OcamlExecutable.new({
     :alias_for_main_task => "haxe#{compiler.exe_suffix}",
-    :patches => [HaxeBackends.new(ACTIVE_BACKENDS)],
+    :patches => [HaxeBackends.new(ACTIVE_BACKENDS)] + $tracing,
     :base_dir => "./",
     :target_rel => "haxe#{compiler.exe_suffix}",
     :files => files,
@@ -868,6 +944,8 @@ libs[:ttflib].o[:depends_on] += [libs[:swflib], libs[:extlib]]
 end
 
 $tasks.each {|v| v.rake_task }
+
+My_Task.new({"clean" => ["clean_haxe", "clean_libs"]}, []).rake_task
 
 # makefile rake task {{{ 1
 
@@ -910,7 +988,6 @@ task :makefile do
   }
   out.write("")
 
-  out.write("")
   # HELP_TEXT.split("\n").each {|v|
   #   out.write("# #{v.gsub("drake", "make")}")
   # }

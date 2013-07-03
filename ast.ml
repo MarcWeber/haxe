@@ -415,7 +415,7 @@ let is_lower_ident i =
 	in
 	loop 0
 
-let pos = snd
+let pos (a,b) = snd (a,b)
 
 let is_postfix (e,_) = function
 	| Increment | Decrement -> (match e with EConst _ | EField _ | EArray _ -> true | _ -> false)
@@ -425,7 +425,7 @@ let is_prefix = function
 	| Increment | Decrement -> true
 	| Not | Neg | NegBits -> true
 
-let base_class_name = snd
+let base_class_name (a,b) = snd (a,b)
 
 let null_pos = { pfile = "?"; pmin = -1; pmax = -1 }
 
