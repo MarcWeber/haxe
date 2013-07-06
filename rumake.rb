@@ -191,25 +191,29 @@ class OcamlCC
       in_ = o.first(:in)
       pre = ""
 
-      if action != :link && use_cppo then
-        # this is hacky: run cppo, replacing original file
-        pre = "
-        grep -q '#ifdef' #{in_} && {
-        cp #{in_}  #{in_}.bak;
-        #{cppo_executable_fun.call} #{cppo_flags.join(' ')} #{o.first(:in)} > #{in_}.cppo;
-        mv #{in_}.cppo #{in_};
-        sed -i 's/^#.*//' #{in_}
-        } || true;"
-      end
+      # if action != :link && use_cppo then
+      #   # this is hacky: run cppo, replacing original file
+      #   pre = "
+      #   grep -q '#ifdef' #{in_} && {
+      #   cp #{in_}  #{in_}.bak;
+      #   #{cppo_executable_fun.call} #{cppo_flags.join(' ')} #{o.first(:in)} > #{in_}.cppo;
+      #   mv #{in_}.cppo #{in_};
+      #   sed -i 's/^#.*//' #{in_}
+      #   } || true;"
+      # end
+
+      use_camlp4 = action != :link && camlp4
+      use_cppo = action != :link && use_cppo
+      # you can uncomment the hack above and comment the cppo line below
+      raise "bad: two -pp not supported for #{o.first(:out)}" if use_camlp4 && use_cppo
 
       [ 
       pre,
       cc,
       libs_cflags,
       includes.map {|v| "-I #{v}"},
-      action != :link && camlp4 ? "-pp '#{camlp4} #{camlp4_flags.join(' ')}'" : "",
-      # second -pp arg is executed first !
-      # action != :link && use_cppo ? "-pp '#{cppo_executable_fun.call} #{cppo_flags.join(' ')}'" : "",
+      use_camlp4 ? "-pp '#{camlp4} #{camlp4_flags.join(' ')}'" : "",
+      action != :link && use_cppo ? "-pp '#{cppo_executable_fun.call} #{cppo_flags.join(' ')}'" : "",
       dependencies,
       "-o #{o.first(:out)} -c #{in_}"
       ]
@@ -428,7 +432,7 @@ class OcamlBuildable
 
     @o[:files].keys.to_a.each {|file|
       file_o = @o[:files][file]
-      file_o[:camlp4] = 'camlp4o'
+      # file_o[:camlp4] = 'camlp4o'
       if @o.fetch(:mlis, false) || file_o.fetch(:mli, false)
         @o[:files]["#{file}i"] = file_o.clone
         file_o[:ml_deps] = ["#{file}i"]
@@ -747,7 +751,10 @@ class Tracing
     }
   end
 end
-$tracing = [Tracing.new]
+
+# luckily I do no longer need this now
+# $tracing = [Tracing.new]
+$tracing = []
 
 $libs_to_clean_tasks = Set.new
 $libs_to_clean = Set.new
@@ -763,7 +770,7 @@ $repositories.each_pair {|k,r| r.tasks }
   OcamlExecutable.new({
     :alias_for_main_task => "tracetest#{compiler.exe_suffix}",
     :patches => $tracing,
-    :base_dir => "./",
+    :base_dir => "trace",
     :target_rel => "tracetest#{compiler.exe_suffix}",
     :files => {"tracetest.ml" => {}},
     :compiler => compiler,
@@ -939,10 +946,10 @@ libs[:ttflib].o[:depends_on] += [libs[:swflib], libs[:extlib]]
 end
 
 My_CleanTask.new("clean_libs_my", $libs_to_clean.to_a)
-task "clean_libs_make" => $libs_to_clean_tasks.to_a
-task "clean_libs" => ["clean_libs_my", "clean_libs_make"]
+My_Task.new({"clean_libs_make" => $libs_to_clean_tasks.to_a}, [])
+My_Task.new({"clean_libs" => ["clean_libs_my", "clean_libs_make"]}, [])
 
-My_FileTask.new({"run_tracetest" => ["tracetest"]}, ["./tracetest"])
+My_FileTask.new({"run_tracetest" => ["trace/tracetest"]}, ["./trace/tracetest"])
 
 $tasks.each {|v| v.rumake_task }
 
@@ -967,7 +974,10 @@ class MakefileWriter
 end
 
 
-task :makefile do
+FileTask.new({
+  :files => "makefile-inlined",
+  :phony => true
+  }) do
   # currently broken
   #
   out = MakefileWriter.new
@@ -1009,7 +1019,7 @@ task :makefile do
     }
   }
 
-  File.open('makefile-generated-by-rake', "wb") { |file| file.write(makefile) }
+  File.open('makefile-inlined', "wb") { |file| file.write(makefile) }
 end
 
 Rumake::TaskContainer.instance.init("rumake.cache", 4)
