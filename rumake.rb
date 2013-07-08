@@ -1,6 +1,6 @@
 # encoding: UTF-8
 
-require_relative "lib-ruby/rumake/task.rb"
+require_relative "rumake/rumake/task.rb"
 include Rumake
 # no longer using rake nor drake. Both didn't fit my needs.
 # Be simple but accurate
