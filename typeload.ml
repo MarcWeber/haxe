@@ -304,18 +304,26 @@ let rec load_type_def ctx p t =
 let check_param_constraints ctx types t pl c p =
 	match follow t with
 	| TMono _ -> ()
+	| TInst({cl_kind = KTypeParameter _},_) -> ()
 	| _ ->
 		let ctl = (match c.cl_kind with KTypeParameter l -> l | _ -> []) in
 		List.iter (fun ti ->
 			let ti = apply_params types pl ti in
 			let ti = (match follow ti with
-				| TInst ({ cl_kind = KGeneric }as c,pl) ->
+				| TInst ({ cl_kind = KGeneric } as c,pl) ->
 					(* if we solve a generic contraint, let's substitute with the actual generic instance before unifying *)
 					let _,_, f = ctx.g.do_build_instance ctx (TClassDecl c) p in
 					f pl
+				| TInst({cl_kind = KGenericInstance(c2,tl)},_) ->
+					(* build generic instance again with applied type parameters (issue 1965) *)
+					let _,_, f = ctx.g.do_build_instance ctx (TClassDecl c2) p in
+					f (List.map (fun t -> apply_params types pl t) tl)
 				| _ -> ti
 			) in
-			unify ctx t ti p
+			try 
+				unify_raise ctx t ti p
+			with Error(Unify l,p) ->
+				if not ctx.untyped then display_error ctx (error_msg (Unify (Constraint_failure (s_type_path c.cl_path) :: l))) p;
 		) ctl
 
 (* build an instance from a full type *)
@@ -891,7 +899,9 @@ let rec return_flow ctx e =
 				loop dt1;
 				(match dt2 with None -> () | Some dt -> loop dt)
 			| DTBind (_,d) -> loop d
-			| DTSwitch (_,cl) -> List.iter (fun (_,dt) -> loop dt) cl
+			| DTSwitch (_,cl,dto) ->
+				List.iter (fun (_,dt) -> loop dt) cl;
+				(match dto with None -> () | Some dt -> loop dt)
 			| DTGoto i -> loop (dt.dt_dt_lookup.(i))
 		in
 		loop (dt.dt_dt_lookup.(dt.dt_first))
@@ -913,6 +923,89 @@ let rec return_flow ctx e =
 (* ---------------------------------------------------------------------- *)
 (* PASS 1 & 2 : Module and Class Structure *)
 
+let is_generic_parameter ctx c =
+	(* first check field parameters, then class parameters *)
+	try
+		ignore (List.assoc (snd c.cl_path) ctx.curfield.cf_params);
+		Meta.has Meta.Generic ctx.curfield.cf_meta
+	with Not_found -> try
+		ignore(List.assoc (snd c.cl_path) ctx.type_params);
+		(match ctx.curclass.cl_kind with | KGeneric -> true | _ -> false);
+	with Not_found ->
+		false
+
+let check_extends ctx c t p = match follow t with
+	| TInst ({ cl_path = [],"Array" },_)
+	| TInst ({ cl_path = [],"String" },_)
+	| TInst ({ cl_path = [],"Date" },_)
+	| TInst ({ cl_path = [],"Xml" },_) when ((not (platform ctx.com Cpp)) && (match c.cl_path with ("mt" | "flash") :: _ , _ -> false | _ -> true)) ->
+		error "Cannot extend basic class" p;
+	| TInst (csup,params) ->
+		if is_parent c csup then error "Recursive class" p;
+		begin match csup.cl_kind with
+			| KTypeParameter _ when not (is_generic_parameter ctx csup) -> error "Cannot extend non-generic type parameters" p
+			| _ -> csup,params
+		end
+	| _ -> error "Should extend by using a class" p
+
+let rec add_constructor ctx c p =
+	match c.cl_constructor, c.cl_super with
+	| None, Some ({ cl_constructor = Some cfsup } as csup,cparams) when not c.cl_extern ->
+		let cf = {
+			cfsup with
+			cf_pos = p;
+			cf_meta = [];
+			cf_doc = None;
+			cf_expr = None;
+		} in
+		let r = exc_protect ctx (fun r ->
+			let t = mk_mono() in
+			r := (fun() -> t);
+			let ctx = { ctx with
+				curfield = cf;
+				pass = PTypeField;
+			} in
+			ignore (follow cfsup.cf_type); (* make sure it's typed *)
+			(if ctx.com.config.pf_overload then List.iter (fun cf -> ignore (follow cf.cf_type)) cf.cf_overloads);
+			let args = (match cfsup.cf_expr with
+				| Some { eexpr = TFunction f } ->
+					List.map (fun (v,def) ->
+						(*
+							let's optimize a bit the output by not always copying the default value
+							into the inherited constructor when it's not necessary for the platform
+						*)
+						match ctx.com.platform, def with
+						| _, Some _ when not ctx.com.config.pf_static -> v, (Some TNull)
+						| Flash, Some (TString _) -> v, (Some TNull)
+						| Cpp, Some (TString _) -> v, def
+						| Cpp, Some _ -> { v with v_type = ctx.t.tnull v.v_type }, (Some TNull)
+						| _ -> v, def
+					) f.tf_args
+				| _ ->
+					match follow cfsup.cf_type with
+					| TFun (args,_) -> List.map (fun (n,o,t) -> alloc_var n (if o then ctx.t.tnull t else t), if o then Some TNull else None) args
+					| _ -> assert false
+			) in
+			let p = c.cl_pos in
+			let vars = List.map (fun (v,def) -> alloc_var v.v_name (apply_params csup.cl_types cparams v.v_type), def) args in
+			let super_call = mk (TCall (mk (TConst TSuper) (TInst (csup,cparams)) p,List.map (fun (v,_) -> mk (TLocal v) v.v_type p) vars)) ctx.t.tvoid p in
+			let constr = mk (TFunction {
+				tf_args = vars;
+				tf_type = ctx.t.tvoid;
+				tf_expr = super_call;
+			}) (TFun (List.map (fun (v,c) -> v.v_name, c <> None, v.v_type) vars,ctx.t.tvoid)) p in
+			cf.cf_expr <- Some constr;
+			cf.cf_type <- t;
+			unify ctx t constr.etype p;
+			t
+		) "add_constructor" in
+		cf.cf_type <- TLazy r;
+		c.cl_constructor <- Some cf;
+		delay ctx PForce (fun() -> ignore((!r)()));
+	| _ ->
+		(* nothing to do *)
+		()
+
 let set_heritance ctx c herits p =
 	let ctx = { ctx with curclass = c; type_params = c.cl_types; } in
 	let process_meta csup =
@@ -930,25 +1023,16 @@ let set_heritance ctx c herits p =
 		| HExtends t ->
 			if c.cl_super <> None then error "Cannot extend several classes" p;
 			let t = load_instance ctx t p false in
-			(match follow t with
-			| TInst ({ cl_path = [],"Array" },_)
-			| TInst ({ cl_path = [],"String" },_)
-			| TInst ({ cl_path = [],"Date" },_)
-			| TInst ({ cl_path = [],"Xml" },_) when ((not (platform ctx.com Cpp)) && (match c.cl_path with ("mt" | "flash") :: _ , _ -> false | _ -> true)) ->
-				error "Cannot extend basic class" p;
-			| TInst (csup,params) ->
-				csup.cl_build();
-				if is_parent c csup then error "Recursive class" p;
-				process_meta csup;
-				(* interface extends are listed in cl_implements ! *)
-				if c.cl_interface then begin
-					if not csup.cl_interface then error "Cannot extend by using a class" p;
-					c.cl_implements <- (csup,params) :: c.cl_implements
-				end else begin
-					if csup.cl_interface then error "Cannot extend by using an interface" p;
-					c.cl_super <- Some (csup,params)
-				end
-			| _ -> error "Should extend by using a class" p)
+			let csup,params = check_extends ctx c t p in
+			csup.cl_build();
+			process_meta csup;
+			if c.cl_interface then begin
+				if not csup.cl_interface then error "Cannot extend by using a class" p;
+				c.cl_implements <- (csup,params) :: c.cl_implements
+			end else begin
+				if csup.cl_interface then error "Cannot extend by using an interface" p;
+				c.cl_super <- Some (csup,params)
+			end
 		| HImplements t ->
 			let t = load_instance ctx t p false in
 			(match follow t with
@@ -1005,12 +1089,20 @@ let rec type_type_params ?(enum_constructor=false) ctx path get_params p tp =
 		n, t
 	| _ ->
 		let r = exc_protect ctx (fun r ->
-			r := (fun _ -> error "Recursive constraint parameter is not allowed" p);
+			r := (fun _ -> t);
 			let ctx = { ctx with type_params = ctx.type_params @ get_params() } in
 			let constr = List.map (load_complex_type ctx p) tp.tp_constraints in
-			List.iter (fun t -> ignore(follow t)) constr; (* force other constraints evaluation to check recursion *)
+			(* check against direct recursion *)
+			let rec loop t =
+				match follow t with
+				| TInst (c2,_) when c == c2 -> error "Recursive constraint parameter is not allowed" p
+				| TInst ({ cl_kind = KTypeParameter cl },_) ->
+					List.iter loop cl
+				| _ ->
+					()
+			in
+			List.iter loop constr;
 			c.cl_kind <- KTypeParameter constr;
-			r := (fun _ -> t);
 			t
 		) "constraint" in
 		delay ctx PForce (fun () -> ignore(!r()));
@@ -1395,8 +1487,15 @@ let init_class ctx c p context_init herits fields =
 		match e with
 		| None -> ()
 		| Some e ->
+			let check_cast e =
+				(* insert cast to keep explicit field type (issue #1901) *)
+				if not (type_iseq e.etype cf.cf_type)
+				then mk (TCast(e,None)) cf.cf_type e.epos
+				else e
+			in
 			let r = exc_protect ctx (fun r ->
-				if not !return_partial_type then begin
+				(* type constant init fields (issue #1956) *)
+				if not !return_partial_type || (match fst e with EConst _ -> true | _ -> false) then begin
 					r := (fun() -> t);
 					context_init();
 					if ctx.com.verbose then Common.log ctx.com ("Typing " ^ (if ctx.in_macro then "macro " else "") ^ s_type_path c.cl_path ^ "." ^ cf.cf_name);
@@ -1415,7 +1514,7 @@ let init_class ctx c p context_init herits fields =
 							| None -> display_error ctx "Extern variable initialization must be a constant value" p; e
 						end
 					| Var v when not stat || (v.v_read = AccInline) ->
-						let e = match Optimizer.make_constant_expression ctx e with Some e -> e | None -> display_error ctx "Variable initialization must be a constant value" p; e in
+						let e = match Optimizer.make_constant_expression ctx e with Some e -> check_cast e | None -> display_error ctx "Variable initialization must be a constant value" p; e in
 						e
 					| _ ->
 						e
@@ -1811,67 +1910,10 @@ let init_class ctx c p context_init herits fields =
 	(*
 		make sure a default contructor with same access as super one will be added to the class structure at some point.
 	*)
-	let rec add_constructor c =
-		match c.cl_constructor, c.cl_super with
-		| None, Some ({ cl_constructor = Some cfsup } as csup,cparams) when not c.cl_extern ->
-			let cf = {
-				cfsup with
-				cf_pos = p;
-				cf_meta = [];
-				cf_doc = None;
-				cf_expr = None;
-			} in
-			let r = exc_protect ctx (fun r ->
-				let t = mk_mono() in
-				r := (fun() -> t);
-				let ctx = { ctx with
-					curfield = cf;
-					pass = PTypeField;
-				} in
-				ignore (follow cfsup.cf_type); (* make sure it's typed *)
-				(if ctx.com.config.pf_overload then List.iter (fun cf -> ignore (follow cf.cf_type)) cf.cf_overloads);
-				let args = (match cfsup.cf_expr with
-					| Some { eexpr = TFunction f } ->
-						List.map (fun (v,def) ->
-							(*
-								let's optimize a bit the output by not always copying the default value
-								into the inherited constructor when it's not necessary for the platform
-							*)
-							match ctx.com.platform, def with
-							| _, Some _ when not ctx.com.config.pf_static -> v, (Some TNull)
-							| Flash, Some (TString _) -> v, (Some TNull)
-							| Cpp, Some (TString _) -> v, def
-							| Cpp, Some _ -> { v with v_type = ctx.t.tnull v.v_type }, (Some TNull)
-							| _ -> v, def
-						) f.tf_args
-					| _ ->
-						match follow cfsup.cf_type with
-						| TFun (args,_) -> List.map (fun (n,o,t) -> alloc_var n (if o then ctx.t.tnull t else t), if o then Some TNull else None) args
-						| _ -> assert false
-				) in
-				let p = c.cl_pos in
-				let vars = List.map (fun (v,def) -> alloc_var v.v_name (apply_params csup.cl_types cparams v.v_type), def) args in
-				let super_call = mk (TCall (mk (TConst TSuper) (TInst (csup,cparams)) p,List.map (fun (v,_) -> mk (TLocal v) v.v_type p) vars)) ctx.t.tvoid p in
-				let constr = mk (TFunction {
-					tf_args = vars;
-					tf_type = ctx.t.tvoid;
-					tf_expr = super_call;
-				}) (TFun (List.map (fun (v,c) -> v.v_name, c <> None, v.v_type) vars,ctx.t.tvoid)) p in
-				cf.cf_expr <- Some constr;
-				cf.cf_type <- t;
-				unify ctx t constr.etype p;
-				t
-			) "add_constructor" in
-			cf.cf_type <- TLazy r;
-			c.cl_constructor <- Some cf;
-			delay ctx PForce (fun() -> ignore((!r)()));
-		| _ ->
-			(* nothing to do *)
-			()
-	in
+
   (* add_constructor does not deal with overloads correctly *)
   if not ctx.com.config.pf_overload then
-  	add_constructor c;
+  	add_constructor ctx c p;
 	(* check overloaded constructors *)
 	(if ctx.com.config.pf_overload then match c.cl_constructor with
 	| Some ctor ->

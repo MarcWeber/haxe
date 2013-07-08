@@ -1270,7 +1270,7 @@ try
 			Codegen.captured_vars com;
 			Codegen.rename_local_vars com;
 		] in
-		List.iter (Codegen.post_process filters) com.types;
+		List.iter (Codegen.post_process tctx filters) com.types;
 		Codegen.post_process_end();
 		List.iter (fun f -> f()) (List.rev com.filters);
 		List.iter (Codegen.save_class_state tctx) com.types;
@@ -1369,8 +1369,10 @@ try
 		if r <> 0 then failwith ("Command failed with error " ^ string_of_int r)
 	) (List.rev !cmds)
 with
-	| Abort | Typecore.Fatal_error ->
+	| Abort ->
 		()
+	| Typecore.Fatal_error (m,p) ->
+		error ctx m p
 	| Common.Abort (m,p) ->
 		error ctx m p
 	| Lexer.Error (m,p) ->

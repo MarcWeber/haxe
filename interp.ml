@@ -488,7 +488,10 @@ let neko =
 	let vm = Extc.dlcall1 (load "neko_vm_alloc") null in
 	ignore(Extc.dlcall1 (load "neko_vm_select") vm);
 	let loader = Extc.dlcall2 (load "neko_default_loader") null null in
-	let loadprim = Extc.dlcall2 (load "neko_val_field") loader (Extc.dlcall1 (load "neko_val_id") (Extc.dlstring "loadprim")) in
+	let loadprim =
+		let l1 = load "neko_val_field" in
+		let l2 = Extc.dlcall1 (load "neko_val_id") (Extc.dlstring "loadprim") in
+		Extc.dlcall2 (l1) loader (l2) in
 
 	let callN = load "neko_val_callN" in
 	let callEx = load "neko_val_callEx" in
@@ -1633,7 +1636,7 @@ let std_lib =
 			VInt (((get_ctx()).curapi.get_com()).run_command (vstring cmd))
 		);
 		"sys_exit", Fun1 (fun code ->
-			if (get_ctx()).curapi.use_cache() then raise Typecore.Fatal_error;
+			if (get_ctx()).curapi.use_cache() then raise (Typecore.Fatal_error ("",Ast.null_pos));
 			exit (vint code);
 		);
 		"sys_exists", Fun1 (fun file ->
@@ -2053,6 +2056,12 @@ let macro_lib =
 				raise Abort
 			| _ -> error()
 		);
+		"fatal_error", Fun2 (fun msg p ->
+			match msg, p with
+			| VString s, VAbstract (APos p) ->
+				raise (Typecore.Fatal_error (s,p))
+			| _ -> error()
+		);		
 		"warning", Fun2 (fun msg p ->
 			match msg, p with
 			| VString s, VAbstract (APos p) ->
@@ -3752,8 +3761,8 @@ and encode_expr e =
 				26, [encode_path t]
 			| ETernary (econd,e1,e2) ->
 				27, [loop econd;loop e1;loop e2]
-			| ECheckType (e,t) ->
-				28, [loop e; encode_ctype t]
+			| ECheckType (e,t,so) ->
+				28, [loop e; encode_ctype t;null enc_string so]
 			| EMeta (m,e) ->
 				29, [encode_meta_entry m;loop e]
 		in
@@ -4015,8 +4024,8 @@ let rec decode_expr v =
 			EDisplayNew (decode_path t)
 		| 27, [e1;e2;e3] ->
 			ETernary (loop e1,loop e2,loop e3)
-		| 28, [e;t] ->
-			ECheckType (loop e, decode_ctype t)
+		| 28, [e;t;so] ->
+			ECheckType (loop e, decode_ctype t, opt dec_string so)
 		| 29, [m;e] ->
 			EMeta (decode_meta_entry m,loop e)
 		| 30, [e;f] ->

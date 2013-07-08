@@ -179,6 +179,7 @@ let add_constraint_checks ctx ctypes pl f tl p =
 			delay ctx PCheckConstraint (fun() ->
 				List.iter (fun ct ->
 					try
+						if has_mono m then raise (Unify_error [Unify_custom "Could not resolve full type for constraint checks"; Unify_custom ("Type was " ^ (s_type (print_context()) m))]);
 						Type.unify m ct
 					with Unify_error l ->
 						display_error ctx (error_msg (Unify (Constraint_failure (f.cf_name ^ "." ^ name) :: l))) p;
@@ -922,7 +923,7 @@ let rec using_field ctx mode e i p =
 					Type.unify e.etype t0;
 					(* early constraints check is possible because e.etype has no monomorphs *)
 		 			List.iter2 (fun m (name,t) -> match follow t with
-						| TInst ({ cl_kind = KTypeParameter constr },_) when constr <> [] ->
+						| TInst ({ cl_kind = KTypeParameter constr },_) when constr <> [] && not (has_mono m) ->
 							List.iter (fun tc -> Type.unify m (map tc)) constr
 						| _ -> ()
 					) monos cf.cf_params;
@@ -1826,7 +1827,7 @@ and type_unop ctx op flag e p =
 							if type_iseq (tfun [e.etype] m) tcf then cf,tcf,m else loop opl
 					| _ :: opl -> loop opl
 				in
-				let cf,t,r = loop a.a_unops in
+				let cf,t,r = try loop a.a_unops with Not_found -> error "Invalid operation" p in
 				if not (can_access ctx c cf true) then error ("Cannot access " ^ cf.cf_name) p;
 				(match cf.cf_expr with
 				| None ->
@@ -2092,6 +2093,7 @@ and type_access ctx e p mode =
 	| EArray (e1,e2) ->
 		let e1 = type_expr ctx e1 Value in
 		let e2 = type_expr ctx e2 Value in
+		let has_abstract_array_access = ref false in
 		(try (match follow e1.etype with
 		| TAbstract ({a_impl = Some c} as a,pl) when a.a_array <> [] ->
 			(match mode with
@@ -2099,6 +2101,7 @@ and type_access ctx e p mode =
 				(* resolve later *)
 				AKAccess (e1, e2)
 			| _ ->
+				has_abstract_array_access := true;
 				let cf,tf,r = find_array_access a pl c e2.etype t_dynamic false in
 				let et = type_module_type ctx (TClassDecl c) None p in
 				let ef = mk (TField(et,(FStatic(c,cf)))) tf p in
@@ -2120,7 +2123,10 @@ and type_access ctx e p mode =
 				let pt = mk_mono() in
 				let t = ctx.t.tarray pt in
 				(try unify_raise ctx et t p
-				with Error(Unify _,_) -> if not ctx.untyped then error ("Array access is not allowed on " ^ (s_type (print_context()) e1.etype)) e1.epos);
+				with Error(Unify _,_) -> if not ctx.untyped then begin
+					if !has_abstract_array_access then error ("No @:arrayAccess function accepts an argument of " ^ (s_type (print_context()) e2.etype)) e1.epos
+					else error ("Array access is not allowed on " ^ (s_type (print_context()) e1.etype)) e1.epos
+				end);
 				pt
 		in
 		let pt = loop e1.etype in
@@ -2679,7 +2685,7 @@ and type_expr ctx (e,p) (with_type:with_type) =
 		) in
 		(match follow ct with
 		| TInst ({cl_kind = KTypeParameter tl} as c,params) ->
-			if not (Codegen.is_generic_parameter ctx c) then error "Only generic type parameters can be constructed" p;
+			if not (Typeload.is_generic_parameter ctx c) then error "Only generic type parameters can be constructed" p;
 			let el = List.map (fun e -> type_expr ctx e Value) el in
 			let ct = (tfun (List.map (fun e -> e.etype) el) ctx.t.tvoid) in
 			if not (List.exists (fun t -> match follow t with
@@ -2995,11 +3001,14 @@ and type_expr ctx (e,p) (with_type:with_type) =
 			raise (DisplayTypes (ct :: List.map (fun f -> f.cf_type) f.cf_overloads))
 		| _ ->
 			error "Not a class" p)
-	| ECheckType (e,t) ->
+	| ECheckType (e,t,so) ->
 		let t = Typeload.load_complex_type ctx p t in
 		let e = type_expr ctx e (WithType t) in
 		let e = Codegen.Abstract.check_cast ctx t e p in
-		unify ctx e.etype t e.epos;
+		begin match so with
+			| None -> unify ctx e.etype t e.epos
+			| Some s -> try unify_raise ctx e.etype t e.epos with Error(Unify _,p) -> error s p
+		end;
 		if e.etype == t then e else mk (TCast (e,None)) t p
 	| EMeta (m,e) ->
 		let old = ctx.meta in
@@ -3098,23 +3107,28 @@ and build_call ctx acc el (with_type:with_type) p =
 			make_call ctx e el t p
 		| _ -> assert false)
 	| AKUsing (et,cl,ef,eparam) ->
-		let ef = prepare_using_field ef in
-		(match et.eexpr with
-		| TField (ec,_) ->
-			let acc = type_field ctx ec ef.cf_name p MCall in
-			(match acc with
-			| AKMacro _ ->
-				build_call ctx acc (Interp.make_ast eparam :: el) with_type p
-			| AKExpr _ | AKInline _ | AKUsing _ ->
-				let params, tfunc = (match follow et.etype with
-					| TFun ( _ :: args,r) -> unify_call_params ctx (Some (TInst(cl,[]),ef)) el args r p (ef.cf_kind = Method MethInline)
+		begin match ef.cf_kind with
+		| Method MethMacro ->
+			let ethis = type_module_type ctx (TClassDecl cl) None p in
+			build_call ctx (AKMacro (ethis,ef)) (Interp.make_ast eparam :: el) with_type p
+		| _ ->
+			let t = follow (field_type ctx cl [] ef p) in
+			(* for abstracts we have to apply their parameters to the static function *)
+			let t,tthis = match follow eparam.etype with
+				| TAbstract(a,tl) -> apply_params a.a_types tl t,apply_params a.a_types tl a.a_this
+				| te -> t,te
+			in
+			let params,args,r = match t with
+				| TFun ((_,_,t1) :: args,r) ->
+					unify ctx tthis t1 eparam.epos;
+					begin match unify_call_params ctx (Some (TInst(cl,[]),ef)) el args r p (ef.cf_kind = Method MethInline) with
+					| el,TFun(args,r) -> el,args,r
 					| _ -> assert false
-				) in
-				let args,r = match tfunc with TFun(args,r) -> args,r | _ -> assert false in
-				let et = {et with etype = TFun(("",false,eparam.etype) :: args,r)} in
-				make_call ctx et (eparam::params) r p
-			| _ -> assert false)
-		| _ -> assert false)
+					end
+				| _ -> assert false
+			in		
+			make_call ctx et (eparam :: params) r p
+		end
 	| AKMacro (ethis,f) ->
 		if ctx.macro_depth > 300 then error "Stack overflow" p;
 		ctx.macro_depth <- ctx.macro_depth + 1;
@@ -3147,7 +3161,7 @@ and build_call ctx acc el (with_type:with_type) p =
 			(* display additional info in the case the error is not part of our original call *)
 			if ep.pfile <> p.pfile || ep.pmax < p.pmin || ep.pmin > p.pmax then old ctx "Called from macro here" p
 		);
-		let e = try f() with Error (m,p) -> display_error ctx (error_msg m) p; ctx.on_error <- old; raise Fatal_error in
+		let e = try f() with Error (m,p) -> ctx.on_error <- old; raise (Fatal_error ((error_msg m),p)) in
 		ctx.on_error <- old;
 		e
 	| AKNo _ | AKSet _ | AKAccess _ ->
@@ -3660,8 +3674,8 @@ and flush_macro_context mint ctx =
 		mint
 	end else mint in
 	(* we should maybe ensure that all filters in Main are applied. Not urgent atm *)
-	(try Interp.add_types mint types (Codegen.post_process [Codegen.Abstract.handle_abstract_casts mctx; Codegen.captured_vars mctx.com; Codegen.rename_local_vars mctx.com])
-	with Error (e,p) -> display_error ctx (error_msg e) p; raise Fatal_error);
+	(try Interp.add_types mint types (Codegen.post_process mctx [Codegen.Abstract.handle_abstract_casts mctx; Codegen.captured_vars mctx.com; Codegen.rename_local_vars mctx.com])
+	with Error (e,p) -> raise (Fatal_error(error_msg e,p)));
 	Codegen.post_process_end()
 
 let create_macro_interp ctx mctx =
