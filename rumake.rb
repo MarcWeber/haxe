@@ -354,7 +354,6 @@ class My_FileTask < My_MakeFileTask
     file @hash.rewrite_deps do
       @cmds.each {|v|
         sh v
-        puts "done with #{v}"
       }
     end
   rescue Exception => e
@@ -518,18 +517,31 @@ class OcamlBuildable
         cppo_dep = ["cppo/cppo"]
         File.absolute_path("cppo/cppo")
       }
+      if file_o[:ocamllex]
+        once file do
+          My_FileTask.new({"#{o[:base_dir]}/#{file}" => ["#{o[:base_dir]}/#{file}l"] }, ["cd #{o[:base_dir]}; ocamllex #{file}l"])
+        end
+      end
+      if file_o[:ocamlyacc]
+        once file do
+          # ocamlyacc creates .mli and a .ml file
+          My_FileTask.new({"#{o[:base_dir]}/#{file}" => ["#{o[:base_dir]}/#{file}y"] }, ["cd #{o[:base_dir]}; ocamlyacc #{file}y"])
+          My_Task.new({"#{o[:base_dir]}/#{file}i" => ["#{o[:base_dir]}/#{file}"]}, [])
+        end
+      end
+
       case file
       when /\.ml$/
         ml_deps = (o[:files_sorted] && file_o[:ml_deps]).map {|v| File.join(o[:base_dir], cc.ml_mod_ext(v) ) }
         cmd = "cd #{o[:base_dir]}; #{cc.cc_compile({:cppo_executable_fun => cppo_executable_fun,:out => file_o[:out_rel], :depends_on => depends_on, :in => file}, annot, o, file_o)}"
-        My_FileTask.new({file_o[:out_absolute] => cppo_dep + [file_o[:absolute_path]] + ml_deps + depends_on + o[:depends_on]}, [cmd])
+        My_FileTask.new({file_o[:out_absolute] => cppo_dep + [file_o[:absolute_path]] + ml_deps + depends_on }, [cmd])
         mls_for_target << file
       when /\.mli$/
         once file_o[:out_absolute] do
           ml_deps = (o[:files_sorted] && file_o[:ml_deps]).map {|v| File.join(o[:base_dir], cc.ml_mod_ext(v) ) }
           cmd = "cd #{o[:base_dir]}; #{cc.cc_compile({:cppo_executable_fun => cppo_executable_fun, :out => file_o[:out_rel], :depends_on => depends_on, :in => file}, o, file_o)}"
 
-          My_FileTask.new({file_o[:out_absolute] => cppo_dep + [File.join("./", file_o[:absolute_path])] + ml_deps + depends_on + o[:depends_on]}, [cmd])
+          My_FileTask.new({file_o[:out_absolute] => cppo_dep + [File.join("./", file_o[:absolute_path])] + ml_deps + depends_on }, [cmd])
         end
       when /\.c$/
         once file_o[:out_absolute] do
@@ -859,6 +871,7 @@ libs[:swflib] = LibMake.new({
   :alias_for_main_task => "swflib.#{compiler.type}",
 })
 
+if true
 libs[:xml_light] = LibMake.new({
     :base_dir => "libs/xml-light", 
     :compiler => compiler,
@@ -866,13 +879,32 @@ libs[:xml_light] = LibMake.new({
     :alias_for_main_task => "xml-light.#{compiler.type}",
     :make_args_by_compiler_type => {"native" => "xml-light.cmxa", "bytecode" => "xml-light.cma"}
 })
-# circular dependencies, there is not much you could optimize ..
-# Lib.new("xml-light", "xml-light", {
-#           "xml_lexer.ml" => {:deps => %w{xmlParser.ml}},
-#           "dtd.ml" => {:deps => %w{xml_lexer.ml}},
-#           "xmlParser.ml" => {:deps => %w{dtd.ml}},
-#           "xml.ml" => {:deps => %w{}},
-#         })
+else
+
+libs[:xml_light] = OcamlLib.new(
+  :base_dir => "libs/xml-light",
+  :compiler => compiler,
+  :target_rel => "xml-light.LIB_EXT",
+  :alias_for_main_task => "xml-light.#{compiler.type}",
+  :patches => lib_tracing,
+  :files => {
+
+    "dtd.mli" => {},
+    "xml.mli" => {},
+    "dtd.mli" => {:ml_deps => %w{xml.mli}},
+    "xmlParser.mli" => {:ml_deps => %w{dtd.mli xml.mli}},
+    "xml_parser.mli" => {:ml_deps => %w{dtd.mli}},
+    "xml_lexer.mli" => {:ml_deps => %w{dtd.mli}},
+
+
+    "dtd.ml" => {:ml_deps => %w{xml.mli xml_lexer.mli dtd.mli}},
+    "xml.ml" => {:ml_deps => %w{dtd.mli xmlParser.mli xml_lexer.mli xml.mli}},
+    "xmlParser.ml" => {:ml_deps => %w{dtd.mli xml.mli xml_lexer.mli xmlParser.mli}},
+    "xml_parser.ml" => {:ocamlyacc => true, :ml_deps => %w{dtd.mli xml_parser.mli xml_parser.mli}},
+    "xml_lexer.ml" => {:ocamllex => true, :ml_deps => %w{xml_lexer.mli}},
+  })
+end
+
 libs[:ttflib] = LibMake.new({
   :base_dir => "libs/ttflib", 
   :compiler => compiler,
@@ -1026,7 +1058,10 @@ Rumake::TaskContainer.instance.init("rumake.cache", 4)
 if ARGV[0] == "list"
   Rumake::TaskContainer.instance.list
 else
-  Rumake::TaskContainer.instance.realise(false, *ARGV)
+  Rumake::TaskContainer.instance.realise({
+    :show_eta => true,
+    :targets => ARGV
+  })
 end
 
 # vim: fdm=marker
