@@ -1,7 +1,18 @@
 # encoding: UTF-8
 
-require_relative "rumake/rumake/task.rb"
-include Rumake
+require_relative "rumake/lib/rumake/task.rb"
+module Rumake
+  class Task
+    alias :init :initialize
+    def initialize(opts, &blk)
+      opts[:prereqs] = opts.fetch(:prereqs, []).select {|v| v.respond_to? :main_target}.map {|v| v.main_target }
+      init(opts, &blk)
+    end
+
+    def main_target; name; end
+  end
+end
+
 # no longer using rake nor drake. Both didn't fit my needs.
 # Be simple but accurate
 
@@ -117,7 +128,7 @@ class LibMake
   def initialize(opts)
     @o = opts
     cc = opts[:compiler]
-    @o[:depends_on] = []
+    @o[:depends_on] ||= []
     @o[:target_rel] = @o[:target_rel].gsub(/\LIB_EXT$/, cc.lib_ext)
     @o[:target_absolute] = File.join(@o[:base_dir], @o[:target_rel])
     @name = File.basename(@o[:base_dir])
@@ -130,23 +141,33 @@ class LibMake
 
   def tasks
     once clean_task do
-      My_Task.new({clean_task => []}, [ "make -C libs/#{@name} clean"])
+      Rumake::Task.new({
+        :aliases => clean_task,
+        :shell_commands => ["make -C libs/#{@name} clean"],
+        :prerqs => @o[:depends_on].main_targets
+       })
     end
 
     make_args = (@o.fetch(:make_args_by_compiler_type, {}).fetch(@o[:compiler].type, []))
-    My_FileTask.new({main_target => ["libs"] + @o.fetch(:depends_on, [])},
-    [ "make -C libs/#{@name} #{@o[:compiler].type == "native" ? "native" : "bytecode"}",
-      # we track more dependencies than the makefile, so the makefile may not
-      # touch the library file causing rebuilds again and again, so update the
-      # timestamp
-      "touch #{main_target}"
-    ]
-    )
-
     # TODO refactor?, make it an configuration option
+    aliases = []
     once @name.to_sym do
-      My_Task.new({@name.to_sym => [main_target]}, [])
+      aliases = [@name.to_sym]
     end
+
+    Rumake::Tasks::File.new ({
+      :files => [main_target],
+      :aliases => aliases,
+      :prerqs => ["libs"] + @o[:depends_on],
+      :shell_commands => 
+        [ "make -C libs/#{@name} #{@o[:compiler].type == "native" ? "native" : "bytecode"}",
+          # we track more dependencies than the makefile, so the makefile may not
+          # touch the library file causing rebuilds again and again, so update the
+          # timestamp
+          "touch #{main_target}"
+        ]
+    })
+
 
     # should be using make clean? TODO
 
@@ -264,6 +285,9 @@ class Array
   # bad style
   def ocaml_as_includes; self; end
   def ocaml_link_flags; self; end
+  def main_targets;
+    self.select {|v| v.respond_to? :main_target}.map {|v| v.main_target}
+  end
 end
 
 class Symbol
@@ -277,7 +301,7 @@ end
 class Hash
   # bad style
   def rewrite_deps
-    Hash[self.map {|k, list| [k, list.select {|v| v.respond_to? :main_target}.map {|v| v.main_target} ] } ]
+    Hash[self.map {|k, list| [k, list.main_targets ] }]
   end
 end
 
@@ -302,84 +326,7 @@ end
 
 # task abstraction {{{2
 
-$tasks = []
-
 # provides makefile implementation for My_FileTask My_Task
-class My_MakeFileTask
-  def makefile(out)
-    @hash.each_pair {|k,v|
-      out.write(<<-EOF)
-#{k}: #{v.join(' ')}
-#{@cmds.map {|v| "\t#{v}"}.join("\n")}
-      EOF
-    }
-  end
-end
-
-
-# A directory task, like My_FileTask, but no timestamp checking
-class My_DirTask < My_MakeFileTask
-  include Rumake
-
-  # hash is target => deps
-  def initialize(hash, cmds)
-    @hash = hash.rewrite_deps
-    raise "unexpected" if @hash.keys.length > 1
-    @cmds = cmds
-    $tasks << self
-  end
-
-  def rumake_task
-    dir @hash do
-      @cmds.each {|v| sh v}
-    end
-  end
-
-end
-
-# a File task. target is a file or directory
-class My_FileTask < My_MakeFileTask
-  include Rumake
-
-  # hash is target => deps
-  def initialize(hash, cmds)
-    hash.values.flatten(1).map {|v| v.assert_not_null}
-    @hash = hash.rewrite_deps
-    raise "unexpected" if @hash.keys.length > 1
-    @cmds = cmds
-    $tasks << self
-  end
-
-  def rumake_task
-    file @hash.rewrite_deps do
-      @cmds.each {|v|
-        sh v
-      }
-    end
-  rescue Exception => e
-    puts "for target #{@hash.keys}"
-    raise e
-  end
-
-end
-
-# a "phony" task, target file/dir will not exist (used for aliasing task names)
-class My_Task < My_MakeFileTask
-  include Rumake
-
-  def initialize(hash, cmds)
-    @hash = hash
-    @cmds = cmds
-    $tasks << self
-  end
-
-  def rumake_task
-    task @hash do
-      @cmds.each {|v| sh v}
-    end
-  end
-
-end
 
 class My_CleanTask
   include Rumake
@@ -389,20 +336,21 @@ class My_CleanTask
     @files = files
     @dirs = dir
     @dirs = [@dirs] unless @dirs.is_a? Array
-    $tasks << self
   end
 
   def rumake_task
-    task @name do
-      @dirs.each {|dir| clean_dir dir }
-      # TODO clean files
-    end
+    #@dirs.each {|dir| clean_dir dir }
+    # out.write()
+    Rumake::Task.new({
+      :aliases => @name,
+      :shell_commands => @dirs.map {|dir| "cd #{dir}; rm #{EXTS_TO_CLEAN.join(' ')} #{@files.join(' ')} || true\n" },
+      :phony => true
+    })
   end
 
   def makefile(out)
     out.write("#{@name}:\n")
     @dirs.each {|dir|
-      out.write("\tcd #{@dir}; rm #{EXTS_TO_CLEAN.join(' ')} #{@files.join(' ')}\n")
     }
   end
 end
@@ -502,7 +450,7 @@ class OcamlBuildable
     target_depends_on = []
     mls_for_target = []
     # ml file tasks, .o tasks
-    o[:files].each_pair {|file, file_o|
+    o[:files].each_pair do |file, file_o|
       depends_on = file_o.fetch(:depends_on, [])
       file_o[:out_rel] = cc.ml_mod_ext(file).gsub(/\.c$/,'.o')
       file_o[:out_absolute] = File.join(o[:base_dir], file_o[:out_rel])
@@ -517,36 +465,68 @@ class OcamlBuildable
         cppo_dep = ["cppo/cppo"]
         File.absolute_path("cppo/cppo")
       }
+      src = "#{o[:base_dir]}/#{file}"
       if file_o[:ocamllex]
+        src = "#{o[:base_dir]}/#{file}l"
         once file do
-          My_FileTask.new({"#{o[:base_dir]}/#{file}" => ["#{o[:base_dir]}/#{file}l"] }, ["cd #{o[:base_dir]}; ocamllex #{file}l"])
+          Rumake::Tasks::File.new ({
+            :files => ["#{o[:base_dir]}/#{file}"],
+            :prereqs => ["#{o[:base_dir]}/#{file}l"],
+            :shell_commands => ["cd #{o[:base_dir]}; ocamllex #{file}l"]
+          })
         end
       end
       if file_o[:ocamlyacc]
+        src = "#{o[:base_dir]}/#{file}y"
         once file do
           # ocamlyacc creates .mli and a .ml file
-          My_FileTask.new({"#{o[:base_dir]}/#{file}" => ["#{o[:base_dir]}/#{file}y"] }, ["cd #{o[:base_dir]}; ocamlyacc #{file}y"])
-          My_Task.new({"#{o[:base_dir]}/#{file}i" => ["#{o[:base_dir]}/#{file}"]}, [])
+          Rumake::Tasks::File.new ({
+            :files => ["#{o[:base_dir]}/#{file}", "#{o[:base_dir]}/#{file}i" ],
+            :prereqs => ["#{o[:base_dir]}/#{file}y"],
+            :shell_commands => ["cd #{o[:base_dir]}; ocamlyacc #{file}y"]
+          })
         end
+      end
+
+      once src do
+        # eg make main.ml depend on .git checkout
+        Rumake::Task.new({
+          :aliases => src,
+          :prereqs => o[:depends_on].main_targets
+        })
       end
 
       case file
       when /\.ml$/
         ml_deps = (o[:files_sorted] && file_o[:ml_deps]).map {|v| File.join(o[:base_dir], cc.ml_mod_ext(v) ) }
         cmd = "cd #{o[:base_dir]}; #{cc.cc_compile({:cppo_executable_fun => cppo_executable_fun,:out => file_o[:out_rel], :depends_on => depends_on, :in => file}, annot, o, file_o)}"
-        My_FileTask.new({file_o[:out_absolute] => cppo_dep + [file_o[:absolute_path]] + ml_deps + depends_on }, [cmd])
+
+        Rumake::Tasks::File.new ({
+          :files => [file_o[:out_absolute]],
+          :prereqs => cppo_dep + [file_o[:absolute_path]] + ml_deps + depends_on,
+          :shell_commands => [cmd]
+        })
         mls_for_target << file
       when /\.mli$/
         once file_o[:out_absolute] do
           ml_deps = (o[:files_sorted] && file_o[:ml_deps]).map {|v| File.join(o[:base_dir], cc.ml_mod_ext(v) ) }
           cmd = "cd #{o[:base_dir]}; #{cc.cc_compile({:cppo_executable_fun => cppo_executable_fun, :out => file_o[:out_rel], :depends_on => depends_on, :in => file}, o, file_o)}"
 
-          My_FileTask.new({file_o[:out_absolute] => cppo_dep + [File.join("./", file_o[:absolute_path])] + ml_deps + depends_on }, [cmd])
+
+          Rumake::Tasks::File.new ({
+            :files => file_o[:out_absolute],
+            :prereqs => cppo_dep + [File.join("./", file_o[:absolute_path])] + ml_deps + depends_on,
+            :shell_commands => [cmd]
+          })
         end
       when /\.c$/
         once file_o[:out_absolute] do
           cmd = "cd #{o[:base_dir]}; ocamlc #{file_o.fetch(:CFLAGS, []).join(' ')} #{file}"
-          My_FileTask.new({file_o[:out_absolute].gsub(/\.c$/, '.o') => [file_o[:absolute_path]] + o[:depends_on]}, [cmd])
+          Rumake::Tasks::File.new ({
+            :files => file_o[:out_absolute].gsub(/\.c$/, '.o'),
+            :prereqs => [file_o[:absolute_path]] + o[:depends_on],
+            :shell_commands => [cmd]
+          })
         end
       else
         raise "unexpected #{file.inspect}"
@@ -581,7 +561,7 @@ class OcamlBuildable
       # else
       #   raise "unexpected #{file.inspect}"
       # end
-    }
+    end
 
     target_depends_on += o[:depends_on]
 
@@ -606,13 +586,19 @@ class OcamlBuildable
         :dependencies => (o[:files_sorted].select {|v| not v =~ /\.(c|mli)$/}).map {|v| cc.ml_mod_ext(v) }
       }
     end
+
     cmd = "cd #{o[:base_dir]}; #{cc.cc_link(opts, o)}"
-    My_FileTask.new({out_absolute => target_depends_on + o[:files].map {|k,v| v[:out_absolute]}}, [cmd])
+
+    Rumake::Tasks::File.new ({
+      :files => out_absolute,
+      :aliases => @o.fetch(:alias_for_main_task, []),
+      :prereqs => target_depends_on + o[:files].map {|k,v| v[:out_absolute]},
+      :shell_commands => [cmd]
+    })
 
     if not @o[:alias_for_main_task].nil?
-      My_Task.new({@o[:alias_for_main_task] => [out_absolute]}, [])
-      if not $tasks.include? "clean_#{@o[:alias_for_main_task]}"
-        My_CleanTask.new("clean_#{@o[:alias_for_main_task]}", o[:base_dir])
+      once "clean_#{@o[:alias_for_main_task]}" do
+        My_CleanTask.new("clean_#{@o[:alias_for_main_task]}", o[:base_dir]).rumake_task
         $libs_to_clean << o[:base_dir]
       end
     end
@@ -665,12 +651,12 @@ class Repository
   # first file: main target
   # additional files: alias targets
   def add_target(files, cmd, depends_on_targets = [])
-    @extra_targets << {:files => files, :cmd => cmd, :depends_on_targets => depends_on_targets}
+    @extra_targets << {:files => files, :cmd => cmd, :depends_on_targets => [main_target] + depends_on_targets}
     self
   end
 
   def main_target
-    @extra_targets[][:files][0]
+    @path
   end
 
   def clean_command(cmd)
@@ -686,37 +672,54 @@ class Repository
         cmds << "curl '#{@repo[:url]}' | tar xzf -"
         cmds << "mv #{@repo[:rename][0]} #{@repo[:rename][1]}" if @repo[:rename]
       when :git
-        cmds << "git clone #{@repo[:url]} #{@path}"
+        branch = (@repo.include? :branch) ? "-b #{@repo[:branch]}" : ""
+        cmds << "git clone #{@repo[:url]} #{branch} #{@path}"
       else raise "not implemented #{@repo[:type]}"
       end
-    My_DirTask.new({"#{@path}" => []}, cmds)
+    Rumake::Tasks::Dir.new(
+      :dirs => ["#{@path}"],
+      :shell_commands => cmds
+    )
 
     # compile etc
     @extra_targets.each {|v|
-      My_FileTask.new({ "#{v[:files][0]}" => ["./#{@path}"] + v[:depends_on_targets] }, v[:cmd])
-
-      v[:files].drop(1).each {|file|
-        # alias targets
-        My_FileTask.new .call({ file => v[:files][0] }, [])
-      }
+      Rumake::Tasks::File.new ({
+        :files => v[:files],
+        :prereqs =>  v[:depends_on_targets],
+        :shell_commands => [*v[:cmd]]
+      })
     }
     if @clean_command
-      My_FileTask.new({"clean_#{@path}" => []}, @clean_command)
+      # TODO ?
+      Rumake::Task.new({
+        :aliases => "clean_#{@path}",
+        :prereqs => @clean_command
+      })
     end
   end
 end
-Repository.new("libs", {:url => 'git://github.com/HaxeFoundation/ocamllibs.git'})
+
+# Repository.new("libs", {:url => 'git://github.com/HaxeFoundation/ocamllibs.git'})
+# waiting for https://github.com/HaxeFoundation/ocamllibs/pull/3
+libs_checkout = Repository.new("libs", {:url => 'git://github.com/MarcWeber/ocamllibs.git'})
+
+# arbitrarely choosing "doc" as directory which must exist to checkout haxe code
+haxe_checkout = Rumake::Tasks::Dir.new({
+  :dirs => ".git",
+  :shell_commands => 'git clone -b t/rake-conditional-compilation git://github.com/MarcWeber/haxe.git haxe-checkout-tmp; rmdir haxe-checkout-tmp/libs; mv haxe-checkout-tmp/.* haxe-checkout-tmp/* .; rmdir haxe-checkout-tmp'
+})
+
 # good idea to use cppo github url? Or release? Let's hope its stable
 Repository.new("cppo", {:url => 'https://github.com/mjambon/cppo.git'}) \
           .add_target(["cppo/cppo"], ["make -C cppo"]) \
           .clean_command(["make -C cppo clean"])
 
-Repository.new("deriving", {:url => "git://github.com/jaked/deriving.git"}, Dir["deriving/**/*.ml", "deriving/**/*.mli"]) \
-          .add_target(["deriving/syntax/deriving"], ["make -C deriving"]) \
-          .clean_command(["make -C deriving clean"])
+# Repository.new("deriving", {:url => "git://github.com/jaked/deriving.git"}, Dir["deriving/**/*.ml", "deriving/**/*.mli"]) \
+#           .add_target(["deriving/syntax/deriving"], ["make -C deriving"]) \
+#           .clean_command(["make -C deriving clean"])
 
-Repository.new('extunix', {:url => 'https://forge.ocamlcore.org/frs/download.php/1146/ocaml-extunix-0.0.6.tar.gz', :type => :tar_gz, :rename => ['ocaml-extunix-0.0.6', 'extunix']} )
-          .add_target(["extunix/_build/src/extunix.LEXT"], ["cd extunix; ./configure && make"]) \
+# Repository.new('extunix', {:url => 'https://forge.ocamlcore.org/frs/download.php/1146/ocaml-extunix-0.0.6.tar.gz', :type => :tar_gz, :rename => ['ocaml-extunix-0.0.6', 'extunix']} )
+#           .add_target(["extunix/_build/src/extunix.LEXT"], ["cd extunix; ./configure && make"]) \
 
 
 class HaxeBackends
@@ -772,8 +775,11 @@ $libs_to_clean_tasks = Set.new
 $libs_to_clean = Set.new
 
 %w{trace Camlp4Tracer instr}.each {|v|
-My_FileTask.new({"trace/#{v}.cmo" => ["trace/#{v}.ml"]},
-  [ "cd trace; ocamlc -dtypes -pp 'camlp4r -I +camlp4 -parser Camlp4QuotationCommon  -parser Camlp4QuotationExpander' -I +camlp4 -o #{v}.cma -c #{v}.ml" ])
+  Rumake::Tasks::File.new ({
+    :files => "trace/#{v}.cmo",
+    :prereqs => ["trace/#{v}.ml"],
+    :shell_commands => [ "cd trace; ocamlc -dtypes -pp 'camlp4r -I +camlp4 -parser Camlp4QuotationCommon  -parser Camlp4QuotationExpander' -I +camlp4 -o #{v}.cma -c #{v}.ml" ]
+  })
 }
 $repositories.each_pair {|k,r| r.tasks }
 
@@ -803,6 +809,7 @@ libs[:extlib] = OcamlLib.new({
   :patches => lib_tracing,
   :mlis => true,
   :propagate_link_flags => ["-cclib", "libs/extc/extc_stubs.o", '-cclib', '-lz' ],
+  :depends_on => [libs_checkout],
   :files => {
     "enum.ml" => {},
     "bitSet.ml" => {:ml_deps => %w{enum.ml}},
@@ -833,6 +840,7 @@ libs[:extc] = OcamlLib.new({
   :target_rel => 'extc.LIB_EXT',
   :alias_for_main_task => "extc.#{compiler.type}",
   :patches => lib_tracing,
+  :depends_on => [libs_checkout],
   :files => {
     "extc.ml" => {:depends_on => l(:extlib)},
     "extc_stubs.c" => {:CFLAGS => %w{-I zlib}}
@@ -844,6 +852,7 @@ libs[:neko] = OcamlLib.new({
   :target_rel => "neko.LIB_EXT",
   :alias_for_main_task => "neko.#{compiler.type}",
   :patches => lib_tracing,
+  :depends_on => [libs_checkout],
   :files => {
     "nast.ml" => {},
     "nxml.ml" => {:ml_deps => %w{nast.ml}},
@@ -857,18 +866,21 @@ libs[:javalib] = LibMake.new({
   :compiler => compiler,
   :target_rel => "java.LIB_EXT",
   :alias_for_main_task => "javalib.#{compiler.type}",
+  :depends_on => [libs_checkout],
 })
 libs[:ziplib] = LibMake.new({
   :base_dir => "libs/ziplib",
   :compiler => compiler,
   :target_rel => "zip.LIB_EXT",
   :alias_for_main_task => "ziplib.#{compiler.type}",
+  :depends_on => [libs_checkout],
 })
 libs[:swflib] = LibMake.new({
   :base_dir => "libs/swflib",
   :compiler => compiler,
   :target_rel =>  "swflib.LIB_EXT",
   :alias_for_main_task => "swflib.#{compiler.type}",
+  :depends_on => [libs_checkout],
 })
 
 if true
@@ -877,7 +889,8 @@ libs[:xml_light] = LibMake.new({
     :compiler => compiler,
     :target_rel => "xml-light.LIB_EXT", 
     :alias_for_main_task => "xml-light.#{compiler.type}",
-    :make_args_by_compiler_type => {"native" => "xml-light.cmxa", "bytecode" => "xml-light.cma"}
+    :make_args_by_compiler_type => {"native" => "xml-light.cmxa", "bytecode" => "xml-light.cma"},
+    :depends_on => [libs_checkout],
 })
 else
 
@@ -887,6 +900,7 @@ libs[:xml_light] = OcamlLib.new(
   :target_rel => "xml-light.LIB_EXT",
   :alias_for_main_task => "xml-light.#{compiler.type}",
   :patches => lib_tracing,
+  :depends_on => [libs_checkout],
   :files => {
 
     "dtd.mli" => {},
@@ -909,7 +923,8 @@ libs[:ttflib] = LibMake.new({
   :base_dir => "libs/ttflib", 
   :compiler => compiler,
   :alias_for_main_task => "ttflib.#{compiler.type}",
-  :target_rel => "ttf.LIB_EXT"
+  :target_rel => "ttf.LIB_EXT",
+  :depends_on => [libs_checkout],
 })
 
 libs[:extc].o[:depends_on] << libs[:extlib]
@@ -948,7 +963,7 @@ libs[:ttflib].o[:depends_on] += [libs[:swflib], libs[:extlib]]
     "typecore.ml"=>{:ml_deps=>["type.ml", "common.ml", "ast.ml"], :depends_on =>l(:extlib) },
     "typeload.ml"=>{:ml_deps=>["typecore.ml", "type.ml", "parser.ml", "optimizer.ml", "lexer.ml", "common.ml", "ast.ml"], :depends_on => l(:extlib)},
     "typer.ml"=>{:ml_deps=>["typeload.ml", "typecore.ml", "type.ml", "parser.ml", "optimizer.ml", "lexer.ml", "interp.ml", "genneko.ml", "genjs.ml", "common.ml", "codegen.ml", "ast.ml"], :depends_on => l(:extlib)},
-    "lexer.ml"=>{:ml_deps=>["ast.ml"]}
+    "lexer.ml"=>{:ocamllex => true, :ml_deps=>["ast.ml"]}
 
   }
 
@@ -965,56 +980,41 @@ libs[:ttflib].o[:depends_on] += [libs[:swflib], libs[:extlib]]
   haxe = OcamlExecutable.new({
     :alias_for_main_task => "haxe#{compiler.exe_suffix}",
     :patches => [HaxeBackends.new(ACTIVE_BACKENDS)] + $tracing,
-    :base_dir => "./",
+    :base_dir => ".",
     :target_rel => "haxe#{compiler.exe_suffix}",
     :files => files,
     :compiler => compiler,
-    :depends_on => l(:extc) + [OcamlLinkFlags.new(
+    :depends_on => l(:extc) + [haxe_checkout, OcamlLinkFlags.new(
       "unix.#{compiler.lib_ext}",
-      "str.#{compiler.lib_ext}"
+      "str.#{compiler.lib_ext}",
     )]
   }).tasks
 
 end
 
-My_CleanTask.new("clean_libs_my", $libs_to_clean.to_a)
-My_Task.new({"clean_libs_make" => $libs_to_clean_tasks.to_a}, [])
-My_Task.new({"clean_libs" => ["clean_libs_my", "clean_libs_make"]}, [])
 
-My_FileTask.new({"run_tracetest" => ["trace/tracetest"]}, ["./trace/tracetest"])
+Rumake::Task.new({ :aliases => "clean_libs_my"  , :prereqs => $libs_to_clean.to_a })
+Rumake::Task.new({ :aliases => "clean_libs_make", :prereqs => $libs_to_clean_tasks.to_a})
 
-$tasks.each {|v| v.rumake_task }
+Rumake::Task.new({ :aliases => "clean_libs", :prereqs => ["clean_libs_my", "clean_libs_make"] })
 
-My_Task.new({"clean" => ["clean_haxe", "clean_libs"]}, []).rumake_task
+Rumake::Task.new({
+  :aliases => "clean",
+  :prereqs => ["clean_haxe", "clean_libs"]
+})
 
 # makefile rake task {{{ 1
 
-class MakefileWriter
-  def initialize()
-    @items = []
-    @cache = Hash.new
-  end
-
-  def write(s)
-    @items << s unless @cache.include? s
-    @cache[s] = true
-  end
-
-  def string
-    return @items.join("\n")
-  end
-end
-
-
-FileTask.new({
+Rumake::Tasks::File.new({
   :files => "makefile-inlined",
   :phony => true
   }) do
   # currently broken
-  #
-  out = MakefileWriter.new
 
-  out.write(<<-EOF)
+  require_relative "rumake/lib/rumake/makefile.rb"
+
+  errors = []
+  out = "
 # this makefile was created by Rakefile
 # TODO: don't depend on libraries if backends are dropped
 # you always have to enable BACKEND_neko
@@ -1023,23 +1023,24 @@ FileTask.new({
 # haxe: creates haxe.native and haxe.bytecode
 # haxe_clean: cleans haxe (has to be run if you enable disable backends,
 # because timestamps don't change..
-  EOF
+".split("\n")
 
-  out.write("# BACKEND_X=yes: comment to disable backend")
+  out << "# BACKEND_X=yes: comment to disable backend"
   BACKEND_FILES.each_pair {|k,v|
-    out.write("#{k == :neko ? "" : "# "}BACKEND_#{k}=yes")
+    out << "#{k == :neko ? "" : "# "}BACKEND_#{k}=yes"
   }
-  out.write("")
+  out << ""
 
   # HELP_TEXT.split("\n").each {|v|
   #   out.write("# #{v.gsub("drake", "make")}")
   # }
-  out.write("")
+  out << ""
 
+  Rumake::TaskContainer.instance.makefile(out, errors)
+  puts "WARNING: errors while creating makefile:"
+  puts errors
 
-  $tasks.each {|v| v.makefile(out) }
-
-  makefile = out.string
+  makefile = out.join("\n")
 
   BACKEND_FILES.each_pair {|k,v|
     makefile = makefile.gsub("-D BACKEND_#{k}", "$(if ${BACKEND_#{k}}, -D BACKEND_#{k},)")
