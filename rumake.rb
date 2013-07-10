@@ -31,6 +31,9 @@ end
 #
 # Now that generating makefiles is supported I could have used haxe ? what
 # about rgl depth_first_visit implementation?
+#
+# TODO: mark cross platform issues to be resolved by CROSS (mainly clean tasks,
+# checkout tasks etc)
 
 
 require "set"
@@ -189,18 +192,6 @@ class OcamlCC
     }.join(' ')
     libs_cflags += o.join_array(:cflags).join(' ')
 
-    cppo_executable_fun = o.first(:cppo_executable_fun)
-
-    # cppo
-    cppo_flags = o.join_array(:cppo_flags)
-    use_cppo = (o.values(:use_cppo).detect {|v| !!v}) || (cppo_flags.length > 0)
-
-    # camlp4
-    camlp4_flags = o.join_array(:camlp4_flags)
-    camlp4_suggestions = o.values(:camlp4) || ['camlp4']
-    raise "multiple camlp4 suggestions #{camlp4_suggestions}" if camlp4_suggestions.length > 1
-    camlp4 = camlp4_suggestions.first
-
     includes     = o.join_array(:includes)
     dependencies = o.join_array(:dependencies).flatten(1)
 
@@ -212,29 +203,46 @@ class OcamlCC
       in_ = o.first(:in)
       pre = ""
 
-      # if action != :link && use_cppo then
-      #   # this is hacky: run cppo, replacing original file
-      #   pre = "
-      #   grep -q '#ifdef' #{in_} && {
-      #   cp #{in_}  #{in_}.bak;
-      #   #{cppo_executable_fun.call} #{cppo_flags.join(' ')} #{o.first(:in)} > #{in_}.cppo;
-      #   mv #{in_}.cppo #{in_};
-      #   sed -i 's/^#.*//' #{in_}
-      #   } || true;"
-      # end
 
-      use_camlp4 = action != :link && camlp4
-      use_cppo = action != :link && use_cppo
+      cppo_executable_fun = o.first(:cppo_executable_fun)
+
+      # cppo
+      cppo_flags = o.join_array(:cppo_flags)
+      use_cppo = (o.values(:use_cppo).detect {|v| !!v}) || (cppo_flags.length > 0)
+
+      # camlp4
+      camlp4_flags = o.join_array(:camlp4_flags)
+      camlp4_suggestions = o.values(:camlp4) || ['camlp4']
+      raise "multiple camlp4 suggestions #{camlp4_suggestions}" if camlp4_suggestions.length > 1
+      camlp4 = camlp4_suggestions.first
+
+      use_camlp4 = camlp4
       # you can uncomment the hack above and comment the cppo line below
-      raise "bad: two -pp not supported for #{o.first(:out)}" if use_camlp4 && use_cppo
+      cmd_cppo = 
+       use_cppo \
+       ? "#{cppo_executable_fun.call} #{cppo_flags.join(' ')}"
+       : nil
+
+      cmd_camlp4 = 
+        use_camlp4 \
+        ? "#{camlp4} #{camlp4_flags.join(' ')}" \
+        : nil
+
+      pp = if use_cppo && use_camlp4
+            # eventually provide patch for cppo adding a -camlp4 option making it do
+            # this Requires tempfile, would requires adding new dependencies
+            "-pp 'ruby trace/cppo_then_camlp4.rb #{cmd_cppo} -- #{cmd_camlp4}'"
+      elsif use_cppo;   "-pp '#{cmd_cppo}'"
+      elsif use_camlp4; "-pp '#{cmd_camlp4}'"
+      else ""
+      end
 
       [ 
       pre,
       cc,
       libs_cflags,
       includes.map {|v| "-I #{v}"},
-      use_camlp4 ? "-pp '#{camlp4} #{camlp4_flags.join(' ')}'" : "",
-      action != :link && use_cppo ? "-pp '#{cppo_executable_fun.call} #{cppo_flags.join(' ')}'" : "",
+      pp,
       dependencies,
       "-o #{o.first(:out)} -c #{in_}"
       ]
@@ -761,6 +769,7 @@ class Tracing
     files.each_pair {|k,v|
       v[:camlp4_flags] ||= []
       v[:camlp4_flags] << File.absolute_path("trace/instr.cmo")
+      v[:camlp4] ||= 'camlp4o'
       v[:depends_on] ||= []
       v[:depends_on] << "trace/instr.cmo"
     }
