@@ -1,5 +1,5 @@
 /*
- * Copyright (C)2005-2013 Haxe Foundation
+ * Copyright (C)2005-2012 Haxe Foundation
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -19,56 +19,34 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  */
+package haxe.macro;
 
-package haxe.ds;
+import haxe.macro.Context;
+import haxe.macro.Expr;
+import haxe.macro.Type;
 
-/**
-	ObjectMap allows mapping of object keys to arbitrary values.
-	
-	On static targets, the keys are considered to be strong references. Refer
-	to `haxe.ds.WeakMap` for a weak reference version.
-	
-	See `Map` for documentation details.
-**/
-extern class ObjectMap<K:haxe.Constraints.ObjectMapKey, V> implements Map.IMap<K,V> {
-	
-	/**
-		Creates a new ObjectMap.
-	**/
-	public function new():Void;
-	
-	/**
-		See `Map.set`
-	**/
-	public function set(key:K, value:V):Void;
-	
-	/**
-		See `Map.get`
-	**/
-	public function get(key:K):Null<V>;
-	
-	/**
-		See `Map.exists`
-	**/
-	public function exists(key:K):Bool;
-	
-	/**
-		See `Map.remove`
-	**/
-	public function remove(key:K):Bool;
-	
-	/**
-		See `Map.keys`
-	**/
-	public function keys():Iterator<K>;
-	
-	/**
-		See `Map.iterator`
-	**/
-	public function iterator():Iterator<V>;
-	
-	/**
-		See `Map.toString`
-	**/
-	public function toString():String;
+using haxe.macro.Tools;
+
+class Build {
+	macro static public function buildFakeEnum():Array<Field> {
+		var fields = Context.getBuildFields();
+		var a = switch(Context.getLocalClass().get().kind) {
+			case KAbstractImpl(a): a;
+			case _: throw "";
+		}
+		var tThis = a.get().type;
+		var ctA = TAbstract(a, []).toComplexType();
+		for (field in fields) {
+			field.access = [AStatic,APublic,AInline];
+			switch(field.kind) {
+				case FVar(t, e):
+					if (e == null) Context.error("Value required", field.pos);
+					var tE = Context.typeof(e);
+					if (!Context.unify(tE, tThis)) Context.error('${tE.toString()} should be ${tThis.toString()}', e.pos);
+					field.kind = FVar(ctA, macro cast $e);
+				case _:
+			}
+		}
+		return fields;
+	}
 }

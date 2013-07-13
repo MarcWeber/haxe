@@ -1374,6 +1374,9 @@ let type_generic_function ctx (e,cf) el ?(using_param=None) with_type p =
 	add_constraint_checks ctx c.cl_types [] cf monos p;
 	let args,ret = match t,using_param with
 		| TFun((_,_,ta) :: args,ret),Some e ->
+			let ta = if not (Meta.has Meta.Impl cf.cf_meta) then ta
+			else match follow ta with TAbstract(a,tl) -> Codegen.Abstract.get_underlying_type a tl | _ -> assert false
+			in
 			(* manually unify first argument *)
 			unify ctx e.etype ta p;
 			args,ret
@@ -3001,14 +3004,11 @@ and type_expr ctx (e,p) (with_type:with_type) =
 			raise (DisplayTypes (ct :: List.map (fun f -> f.cf_type) f.cf_overloads))
 		| _ ->
 			error "Not a class" p)
-	| ECheckType (e,t,so) ->
+	| ECheckType (e,t) ->
 		let t = Typeload.load_complex_type ctx p t in
 		let e = type_expr ctx e (WithType t) in
 		let e = Codegen.Abstract.check_cast ctx t e p in
-		begin match so with
-			| None -> unify ctx e.etype t e.epos
-			| Some s -> try unify_raise ctx e.etype t e.epos with Error(Unify _,p) -> error s p
-		end;
+		unify ctx e.etype t e.epos;
 		if e.etype == t then e else mk (TCast (e,None)) t p
 	| EMeta (m,e) ->
 		let old = ctx.meta in
@@ -3115,7 +3115,7 @@ and build_call ctx acc el (with_type:with_type) p =
 			let t = follow (field_type ctx cl [] ef p) in
 			(* for abstracts we have to apply their parameters to the static function *)
 			let t,tthis = match follow eparam.etype with
-				| TAbstract(a,tl) -> apply_params a.a_types tl t,apply_params a.a_types tl a.a_this
+				| TAbstract(a,tl) when Meta.has Meta.Impl ef.cf_meta -> apply_params a.a_types tl t,apply_params a.a_types tl a.a_this
 				| te -> t,te
 			in
 			let params,args,r = match t with

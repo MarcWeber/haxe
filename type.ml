@@ -1155,6 +1155,10 @@ let rec unify a b =
 		| _ -> error [cannot_unify a b])
 	| TEnum _, TAbstract ({ a_path = [],"EnumValue" },[]) ->
 		()
+	| TEnum(en,_), TAbstract ({ a_path = ["haxe"],"FlatEnum" },[]) when Meta.has Meta.FlatEnum en.e_meta ->
+		()
+	| TFun _, TAbstract ({ a_path = ["haxe"],"Function" },[]) ->
+		()		
 	| TDynamic t , _ ->
 		if t == a then
 			()

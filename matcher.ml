@@ -303,7 +303,7 @@ let to_pattern ctx e t =
 	let rec loop pctx e t =
 		let p = pos e in
 		match fst e with
-		| ECheckType(e, CTPath({tpackage=["haxe";"macro"]; tname="Expr"}), _) ->
+		| ECheckType(e, CTPath({tpackage=["haxe";"macro"]; tname="Expr"})) ->
 			let old = pctx.pc_reify in
 			pctx.pc_reify <- true;
 			let e = loop pctx e t in
@@ -325,7 +325,7 @@ let to_pattern ctx e t =
 			let e = type_expr ctx e (WithType t) in
 			let e = match Optimizer.make_constant_expression ctx ~concat_strings:true e with Some e -> e | None -> e in
 			(match e.eexpr with
-			| TConst c -> mk_con_pat (CConst c) [] t p
+			| TConst c | TCast({eexpr = TConst c},None) -> mk_con_pat (CConst c) [] t p
 			| TTypeExpr mt -> mk_con_pat (CType mt) [] t p
 			| TField(_, FStatic(_,cf)) when is_value_type cf.cf_type ->
 				mk_con_pat (CExpr e) [] cf.cf_type p
@@ -403,6 +403,14 @@ let to_pattern ctx e t =
 							| _ -> ());
 						let et = mk (TTypeExpr (TEnumDecl en)) (TAnon { a_fields = PMap.empty; a_status = ref (EnumStatics en) }) p in
 						mk (TField (et,FEnum (en,ef))) (apply_params en.e_types pl ef.ef_type) p
+					| TAbstract({a_impl = Some c} as a,_) when Meta.has Meta.FakeEnum a.a_meta ->
+						let cf = PMap.find s c.cl_statics in
+						ignore(follow cf.cf_type);
+						let e = begin match cf.cf_expr with
+						| Some ({eexpr = TConst c | TCast({eexpr = TConst c},None)} as e) -> e
+						| _ -> print_endline "Not found"; raise Not_found
+						end in
+						e
 					| _ ->
 						let old = ctx.untyped in
 						ctx.untyped <- true;
@@ -420,7 +428,7 @@ let to_pattern ctx e t =
 							error (error_msg (Unify l)) p
 						end;
 						mk_con_pat (CEnum(en,ef)) [] t p
-                    | TConst c ->
+                    | TConst c | TCast({eexpr = TConst c},None) ->
                     	begin try unify_raise ctx ec.etype t ec.epos with Error (Unify _,_) -> raise Not_found end;
                         unify ctx ec.etype t p;
                         mk_con_pat (CConst c) [] t p
@@ -733,6 +741,14 @@ let rec all_ctors mctx t =
 		h := PMap.add (CConst(TBool true)) Ast.null_pos !h;
 		h := PMap.add (CConst(TBool false)) Ast.null_pos !h;
 		h,false
+	| TAbstract({a_impl = Some c} as a,pl) when Meta.has Meta.FakeEnum a.a_meta ->
+		List.iter (fun cf ->
+			ignore(follow cf.cf_type);
+			if not (Meta.has Meta.Impl cf.cf_meta) then match cf.cf_expr with
+				| Some {eexpr = TConst c | TCast ({eexpr = TConst c},None)} -> h := PMap.add (CConst c) cf.cf_pos !h
+				| _ -> ()
+		) c.cl_ordered_statics;
+		h,false
 	| TAbstract(a,pl) -> all_ctors mctx (Codegen.Abstract.get_underlying_type a pl)
 	| TInst({cl_path=[],"String"},_)
 	| TInst({cl_path=[],"Array"},_) ->
@@ -920,6 +936,8 @@ let convert_switch ctx st cases loop =
 		mk_index_call ()
 	| TInst({cl_path = [],"Array"},_) as t ->
 		mk (TField (e_st,quick_field t "length")) ctx.t.tint p
+	| TAbstract(a,_) when Meta.has Meta.FakeEnum a.a_meta ->
+		mk (TMeta((Meta.Exhaustive,[],p), e_st)) e_st.etype e_st.epos
 	| _ ->
 		e_st
 	in

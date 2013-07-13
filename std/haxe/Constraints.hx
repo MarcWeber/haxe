@@ -20,55 +20,34 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
-package haxe.ds;
+package haxe;
 
 /**
-	ObjectMap allows mapping of object keys to arbitrary values.
+	This type unifies with any function type.
 	
-	On static targets, the keys are considered to be strong references. Refer
-	to `haxe.ds.WeakMap` for a weak reference version.
-	
-	See `Map` for documentation details.
+	It is intended to be used as a type parameter constraint. If used as a real
+	type, the underlying type will be `Dynamic`.
 **/
-extern class ObjectMap<K:haxe.Constraints.ObjectMapKey, V> implements Map.IMap<K,V> {
+abstract Function(Dynamic) { }
+
+/**
+	This type unifies with an enum instance if all constructors of the enum
+	require no arguments.
 	
-	/**
-		Creates a new ObjectMap.
-	**/
-	public function new():Void;
+	It is intended to be used as a type parameter constraint. If used as a real
+	type, the underlying type will be `Dynamic`.
+**/
+abstract FlatEnum(Dynamic) { }
+
+/**
+	This type is compatible with both its type parameters.
 	
-	/**
-		See `Map.set`
-	**/
-	public function set(key:K, value:V):Void;
-	
-	/**
-		See `Map.get`
-	**/
-	public function get(key:K):Null<V>;
-	
-	/**
-		See `Map.exists`
-	**/
-	public function exists(key:K):Bool;
-	
-	/**
-		See `Map.remove`
-	**/
-	public function remove(key:K):Bool;
-	
-	/**
-		See `Map.keys`
-	**/
-	public function keys():Iterator<K>;
-	
-	/**
-		See `Map.iterator`
-	**/
-	public function iterator():Iterator<V>;
-	
-	/**
-		See `Map.toString`
-	**/
-	public function toString():String;
-}
+	It is intended to be used as a type parameter constraint. If used as a real
+	type, the underlying type will be `Dynamic`.
+**/
+abstract Or<L,R>(Dynamic) from L to L from R to R { }
+
+/**
+	The types allowed as key to `haxe.ds.ObjectMap`.
+**/
+extern typedef ObjectMapKey = Or<Class<Dynamic>, {}>;

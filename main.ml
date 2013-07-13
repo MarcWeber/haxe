@@ -514,6 +514,7 @@ let rec process_params create pl =
 
 and wait_loop boot_com host port =
 	let sock = Unix.socket Unix.PF_INET Unix.SOCK_STREAM 0 in
+	(try Unix.setsockopt sock Unix.SO_REUSEADDR true with _ -> ());
 	(try Unix.bind sock (Unix.ADDR_INET (Unix.inet_addr_of_string host,port)) with _ -> failwith ("Couldn't wait on " ^ host ^ ":" ^ string_of_int port));
 	Unix.listen sock 10;
 	Sys.catch_break false;
@@ -732,7 +733,7 @@ and wait_loop boot_com host port =
 		Unix.close sin;
 		(* prevent too much fragmentation by doing some compactions every X run *)
 		incr run_count;
-		if !run_count mod 1 = 50 then begin
+		if !run_count mod 10 = 0 then begin
 			let t0 = get_time() in
 			Gc.compact();
 			if verbose then begin
