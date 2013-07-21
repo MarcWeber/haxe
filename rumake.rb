@@ -1041,6 +1041,9 @@ Rumake::Tasks::File.new({
   }
   out << ""
 
+  out << "OCAMLC=ocamlc"
+  out << "OCAMLOPT=ocamlopt"
+
   # HELP_TEXT.split("\n").each {|v|
   #   out.write("# #{v.gsub("drake", "make")}")
   # }
@@ -1060,6 +1063,8 @@ Rumake::Tasks::File.new({
       makefile = makefile.gsub(" #{file}.cmx", " $(if ${BACKEND_#{k}}, #{file}.cmx,)")
       makefile = makefile.gsub(" #{file}.cmo", " $(if ${BACKEND_#{k}}, #{file}.cmo,)")
       makefile = makefile.gsub(Dir.pwd, '${CURDIR}')
+      makefile = makefile.gsub('ocamlc.opt', '${OCAMLC}')
+      makefile = makefile.gsub('ocamlopt.opt', '${OCAMLOPT}')
     }
   }
 
