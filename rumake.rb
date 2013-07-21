@@ -1058,6 +1058,7 @@ Rumake::Tasks::File.new({
       # mind the space, this does not drop rules at ^
       makefile = makefile.gsub(" #{file}.cmx", " $(if ${BACKEND_#{k}}, #{file}.cmx,)")
       makefile = makefile.gsub(" #{file}.cmo", " $(if ${BACKEND_#{k}}, #{file}.cmo,)")
+      makefile = makefdile.gsub(Dir.pwd, '.')
     }
   }
 
