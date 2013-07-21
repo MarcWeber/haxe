@@ -44,7 +44,7 @@ clean_cppo: make -C cppo clean
 trace/tracetest.ml: 
 
 trace/tracetest.cmx: trace/tracetest.ml
-	cd trace;  ocamlopt.opt  -annot -g     -o tracetest.cmx -c tracetest.ml
+	cd trace;  ocamlopt.opt  -annot -g    -o tracetest.cmx -c tracetest.ml
 
 tracetest: trace/tracetest.cmx
 	cd trace; ocamlopt.opt  -g -o tracetest tracetest.cmx
@@ -58,202 +58,202 @@ clean_tracetest:
 libs/extlib/enum.ml: libs
 
 libs/extlib/enum.cmx: libs/extlib/enum.ml libs/extlib/enum.cmi libs
-	cd libs/extlib;  ocamlopt.opt   -annot -g     -o enum.cmx -c enum.ml
+	cd libs/extlib;  ocamlopt.opt   -annot -g    -o enum.cmx -c enum.ml
 
 libs/extlib/bitSet.ml: libs
 
 libs/extlib/bitSet.cmx: libs/extlib/bitSet.ml libs/extlib/bitSet.cmi libs
-	cd libs/extlib;  ocamlopt.opt   -annot -g     -o bitSet.cmx -c bitSet.ml
+	cd libs/extlib;  ocamlopt.opt   -annot -g    -o bitSet.cmx -c bitSet.ml
 
 libs/extlib/dynArray.ml: libs
 
 libs/extlib/dynArray.cmx: libs/extlib/dynArray.ml libs/extlib/dynArray.cmi libs
-	cd libs/extlib;  ocamlopt.opt   -annot -g     -o dynArray.cmx -c dynArray.ml
+	cd libs/extlib;  ocamlopt.opt   -annot -g    -o dynArray.cmx -c dynArray.ml
 
 libs/extlib/extArray.ml: libs
 
 libs/extlib/extArray.cmx: libs/extlib/extArray.ml libs/extlib/extArray.cmi libs
-	cd libs/extlib;  ocamlopt.opt   -annot -g     -o extArray.cmx -c extArray.ml
+	cd libs/extlib;  ocamlopt.opt   -annot -g    -o extArray.cmx -c extArray.ml
 
 libs/extlib/extHashtbl.ml: libs
 
 libs/extlib/extHashtbl.cmx: libs/extlib/extHashtbl.ml libs/extlib/extHashtbl.cmi libs
-	cd libs/extlib;  ocamlopt.opt   -annot -g     -o extHashtbl.cmx -c extHashtbl.ml
+	cd libs/extlib;  ocamlopt.opt   -annot -g    -o extHashtbl.cmx -c extHashtbl.ml
 
 libs/extlib/extList.ml: libs
 
 libs/extlib/extList.cmx: libs/extlib/extList.ml libs/extlib/extList.cmi libs
-	cd libs/extlib;  ocamlopt.opt   -annot -g     -o extList.cmx -c extList.ml
+	cd libs/extlib;  ocamlopt.opt   -annot -g    -o extList.cmx -c extList.ml
 
 libs/extlib/extString.ml: libs
 
 libs/extlib/extString.cmx: libs/extlib/extString.ml libs/extlib/extString.cmi libs
-	cd libs/extlib;  ocamlopt.opt   -annot -g     -o extString.cmx -c extString.ml
+	cd libs/extlib;  ocamlopt.opt   -annot -g    -o extString.cmx -c extString.ml
 
 libs/extlib/global.ml: libs
 
 libs/extlib/global.cmx: libs/extlib/global.ml libs/extlib/global.cmi libs
-	cd libs/extlib;  ocamlopt.opt   -annot -g     -o global.cmx -c global.ml
+	cd libs/extlib;  ocamlopt.opt   -annot -g    -o global.cmx -c global.ml
 
 libs/extlib/IO.ml: libs
 
 libs/extlib/IO.cmx: libs/extlib/IO.ml libs/extlib/IO.cmi libs
-	cd libs/extlib;  ocamlopt.opt   -annot -g     -o IO.cmx -c IO.ml
+	cd libs/extlib;  ocamlopt.opt   -annot -g    -o IO.cmx -c IO.ml
 
 libs/extlib/option.ml: libs
 
 libs/extlib/option.cmx: libs/extlib/option.ml libs/extlib/option.cmi libs
-	cd libs/extlib;  ocamlopt.opt   -annot -g     -o option.cmx -c option.ml
+	cd libs/extlib;  ocamlopt.opt   -annot -g    -o option.cmx -c option.ml
 
 libs/extlib/pMap.ml: libs
 
 libs/extlib/pMap.cmx: libs/extlib/pMap.ml libs/extlib/pMap.cmi libs
-	cd libs/extlib;  ocamlopt.opt   -annot -g     -o pMap.cmx -c pMap.ml
+	cd libs/extlib;  ocamlopt.opt   -annot -g    -o pMap.cmx -c pMap.ml
 
 libs/extlib/std.ml: libs
 
 libs/extlib/std.cmx: libs/extlib/std.ml libs/extlib/std.cmi libs
-	cd libs/extlib;  ocamlopt.opt   -annot -g     -o std.cmx -c std.ml
+	cd libs/extlib;  ocamlopt.opt   -annot -g    -o std.cmx -c std.ml
 
 libs/extlib/uChar.ml: libs
 
 libs/extlib/uChar.cmx: libs/extlib/uChar.ml libs/extlib/uChar.cmi libs
-	cd libs/extlib;  ocamlopt.opt   -annot -g     -o uChar.cmx -c uChar.ml
+	cd libs/extlib;  ocamlopt.opt   -annot -g    -o uChar.cmx -c uChar.ml
 
 libs/extlib/uTF8.ml: libs
 
 libs/extlib/uTF8.cmx: libs/extlib/uTF8.ml libs/extlib/uTF8.cmi libs
-	cd libs/extlib;  ocamlopt.opt   -annot -g     -o uTF8.cmx -c uTF8.ml
+	cd libs/extlib;  ocamlopt.opt   -annot -g    -o uTF8.cmx -c uTF8.ml
 
 libs/extlib/base64.ml: libs
 
 libs/extlib/base64.cmx: libs/extlib/base64.ml libs/extlib/base64.cmi libs
-	cd libs/extlib;  ocamlopt.opt   -annot -g     -o base64.cmx -c base64.ml
+	cd libs/extlib;  ocamlopt.opt   -annot -g    -o base64.cmx -c base64.ml
 
 libs/extlib/unzip.ml: libs
 
 libs/extlib/unzip.cmx: libs/extlib/unzip.ml libs/extlib/unzip.cmi libs
-	cd libs/extlib;  ocamlopt.opt   -annot -g     -o unzip.cmx -c unzip.ml
+	cd libs/extlib;  ocamlopt.opt   -annot -g    -o unzip.cmx -c unzip.ml
 
 libs/extlib/refList.ml: libs
 
 libs/extlib/refList.cmx: libs/extlib/refList.ml libs/extlib/refList.cmi libs
-	cd libs/extlib;  ocamlopt.opt   -annot -g     -o refList.cmx -c refList.ml
+	cd libs/extlib;  ocamlopt.opt   -annot -g    -o refList.cmx -c refList.ml
 
 libs/extlib/optParse.ml: libs
 
 libs/extlib/optParse.cmx: libs/extlib/optParse.ml libs/extlib/optParse.cmi libs
-	cd libs/extlib;  ocamlopt.opt   -annot -g     -o optParse.cmx -c optParse.ml
+	cd libs/extlib;  ocamlopt.opt   -annot -g    -o optParse.cmx -c optParse.ml
 
 libs/extlib/dllist.ml: libs
 
 libs/extlib/dllist.cmx: libs/extlib/dllist.ml libs/extlib/dllist.cmi libs
-	cd libs/extlib;  ocamlopt.opt   -annot -g     -o dllist.cmx -c dllist.ml
+	cd libs/extlib;  ocamlopt.opt   -annot -g    -o dllist.cmx -c dllist.ml
 
 libs/extlib/multiArray.ml: libs
 
 libs/extlib/multiArray.cmx: libs/extlib/multiArray.ml libs/extlib/multiArray.cmi libs
-	cd libs/extlib;  ocamlopt.opt   -annot -g     -o multiArray.cmx -c multiArray.ml
+	cd libs/extlib;  ocamlopt.opt   -annot -g    -o multiArray.cmx -c multiArray.ml
 
 libs/extlib/enum.mli: libs
 
 libs/extlib/enum.cmi: ./libs/extlib/enum.mli libs
-	cd libs/extlib;  ocamlopt.opt       -o enum.cmi -c enum.mli
+	cd libs/extlib;  ocamlopt.opt      -o enum.cmi -c enum.mli
 
 libs/extlib/bitSet.mli: libs
 
 libs/extlib/bitSet.cmi: ./libs/extlib/bitSet.mli libs/extlib/enum.cmx libs
-	cd libs/extlib;  ocamlopt.opt       -o bitSet.cmi -c bitSet.mli
+	cd libs/extlib;  ocamlopt.opt      -o bitSet.cmi -c bitSet.mli
 
 libs/extlib/dynArray.mli: libs
 
 libs/extlib/dynArray.cmi: ./libs/extlib/dynArray.mli libs/extlib/enum.cmx libs
-	cd libs/extlib;  ocamlopt.opt       -o dynArray.cmi -c dynArray.mli
+	cd libs/extlib;  ocamlopt.opt      -o dynArray.cmi -c dynArray.mli
 
 libs/extlib/extArray.mli: libs
 
 libs/extlib/extArray.cmi: ./libs/extlib/extArray.mli libs/extlib/enum.cmx libs/extlib/bitSet.cmx libs
-	cd libs/extlib;  ocamlopt.opt       -o extArray.cmi -c extArray.mli
+	cd libs/extlib;  ocamlopt.opt      -o extArray.cmi -c extArray.mli
 
 libs/extlib/extHashtbl.mli: libs
 
 libs/extlib/extHashtbl.cmi: ./libs/extlib/extHashtbl.mli libs/extlib/enum.cmx libs
-	cd libs/extlib;  ocamlopt.opt       -o extHashtbl.cmi -c extHashtbl.mli
+	cd libs/extlib;  ocamlopt.opt      -o extHashtbl.cmi -c extHashtbl.mli
 
 libs/extlib/extList.mli: libs
 
 libs/extlib/extList.cmi: ./libs/extlib/extList.mli libs/extlib/enum.cmx libs
-	cd libs/extlib;  ocamlopt.opt       -o extList.cmi -c extList.mli
+	cd libs/extlib;  ocamlopt.opt      -o extList.cmi -c extList.mli
 
 libs/extlib/extString.mli: libs
 
 libs/extlib/extString.cmi: ./libs/extlib/extString.mli libs/extlib/enum.cmx libs
-	cd libs/extlib;  ocamlopt.opt       -o extString.cmi -c extString.mli
+	cd libs/extlib;  ocamlopt.opt      -o extString.cmi -c extString.mli
 
 libs/extlib/global.mli: libs
 
 libs/extlib/global.cmi: ./libs/extlib/global.mli libs
-	cd libs/extlib;  ocamlopt.opt       -o global.cmi -c global.mli
+	cd libs/extlib;  ocamlopt.opt      -o global.cmi -c global.mli
 
 libs/extlib/IO.mli: libs
 
 libs/extlib/IO.cmi: ./libs/extlib/IO.mli libs/extlib/extString.cmx libs
-	cd libs/extlib;  ocamlopt.opt       -o IO.cmi -c IO.mli
+	cd libs/extlib;  ocamlopt.opt      -o IO.cmi -c IO.mli
 
 libs/extlib/option.mli: libs
 
 libs/extlib/option.cmi: ./libs/extlib/option.mli libs
-	cd libs/extlib;  ocamlopt.opt       -o option.cmi -c option.mli
+	cd libs/extlib;  ocamlopt.opt      -o option.cmi -c option.mli
 
 libs/extlib/pMap.mli: libs
 
 libs/extlib/pMap.cmi: ./libs/extlib/pMap.mli libs/extlib/enum.cmx libs
-	cd libs/extlib;  ocamlopt.opt       -o pMap.cmi -c pMap.mli
+	cd libs/extlib;  ocamlopt.opt      -o pMap.cmi -c pMap.mli
 
 libs/extlib/std.mli: libs
 
 libs/extlib/std.cmi: ./libs/extlib/std.mli libs/extlib/enum.cmx libs
-	cd libs/extlib;  ocamlopt.opt       -o std.cmi -c std.mli
+	cd libs/extlib;  ocamlopt.opt      -o std.cmi -c std.mli
 
 libs/extlib/uChar.mli: libs
 
 libs/extlib/uChar.cmi: ./libs/extlib/uChar.mli libs
-	cd libs/extlib;  ocamlopt.opt       -o uChar.cmi -c uChar.mli
+	cd libs/extlib;  ocamlopt.opt      -o uChar.cmi -c uChar.mli
 
 libs/extlib/uTF8.mli: libs
 
 libs/extlib/uTF8.cmi: ./libs/extlib/uTF8.mli libs/extlib/uChar.cmx libs
-	cd libs/extlib;  ocamlopt.opt       -o uTF8.cmi -c uTF8.mli
+	cd libs/extlib;  ocamlopt.opt      -o uTF8.cmi -c uTF8.mli
 
 libs/extlib/base64.mli: libs
 
 libs/extlib/base64.cmi: ./libs/extlib/base64.mli libs/extlib/IO.cmx libs
-	cd libs/extlib;  ocamlopt.opt       -o base64.cmi -c base64.mli
+	cd libs/extlib;  ocamlopt.opt      -o base64.cmi -c base64.mli
 
 libs/extlib/unzip.mli: libs
 
 libs/extlib/unzip.cmi: ./libs/extlib/unzip.mli libs/extlib/IO.cmx libs
-	cd libs/extlib;  ocamlopt.opt       -o unzip.cmi -c unzip.mli
+	cd libs/extlib;  ocamlopt.opt      -o unzip.cmi -c unzip.mli
 
 libs/extlib/refList.mli: libs
 
 libs/extlib/refList.cmi: ./libs/extlib/refList.mli libs/extlib/extList.cmx libs
-	cd libs/extlib;  ocamlopt.opt       -o refList.cmi -c refList.mli
+	cd libs/extlib;  ocamlopt.opt      -o refList.cmi -c refList.mli
 
 libs/extlib/optParse.mli: libs
 
 libs/extlib/optParse.cmi: ./libs/extlib/optParse.mli libs/extlib/extString.cmx libs/extlib/extList.cmx libs/extlib/option.cmx libs/extlib/refList.cmx libs
-	cd libs/extlib;  ocamlopt.opt       -o optParse.cmi -c optParse.mli
+	cd libs/extlib;  ocamlopt.opt      -o optParse.cmi -c optParse.mli
 
 libs/extlib/dllist.mli: libs
 
 libs/extlib/dllist.cmi: ./libs/extlib/dllist.mli libs/extlib/enum.cmx libs
-	cd libs/extlib;  ocamlopt.opt       -o dllist.cmi -c dllist.mli
+	cd libs/extlib;  ocamlopt.opt      -o dllist.cmi -c dllist.mli
 
 libs/extlib/multiArray.mli: libs
 
 libs/extlib/multiArray.cmi: ./libs/extlib/multiArray.mli libs
-	cd libs/extlib;  ocamlopt.opt       -o multiArray.cmi -c multiArray.mli
+	cd libs/extlib;  ocamlopt.opt      -o multiArray.cmi -c multiArray.mli
 
 extlib.native: libs libs/extlib/enum.cmx libs/extlib/bitSet.cmx libs/extlib/dynArray.cmx libs/extlib/extArray.cmx libs/extlib/extHashtbl.cmx libs/extlib/extList.cmx libs/extlib/extString.cmx libs/extlib/global.cmx libs/extlib/IO.cmx libs/extlib/option.cmx libs/extlib/pMap.cmx libs/extlib/std.cmx libs/extlib/uChar.cmx libs/extlib/uTF8.cmx libs/extlib/base64.cmx libs/extlib/unzip.cmx libs/extlib/refList.cmx libs/extlib/optParse.cmx libs/extlib/dllist.cmx libs/extlib/multiArray.cmx libs/extlib/enum.cmi libs/extlib/bitSet.cmi libs/extlib/dynArray.cmi libs/extlib/extArray.cmi libs/extlib/extHashtbl.cmi libs/extlib/extList.cmi libs/extlib/extString.cmi libs/extlib/global.cmi libs/extlib/IO.cmi libs/extlib/option.cmi libs/extlib/pMap.cmi libs/extlib/std.cmi libs/extlib/uChar.cmi libs/extlib/uTF8.cmi libs/extlib/base64.cmi libs/extlib/unzip.cmi libs/extlib/refList.cmi libs/extlib/optParse.cmi libs/extlib/dllist.cmi libs/extlib/multiArray.cmi
 	cd libs/extlib; ocamlopt.opt -a -o extLib.cmxa enum.cmx dynArray.cmx bitSet.cmx extArray.cmx extHashtbl.cmx global.cmx pMap.cmx std.cmx uChar.cmx uTF8.cmx extString.cmx IO.cmx base64.cmx unzip.cmx option.cmx extList.cmx refList.cmx optParse.cmx dllist.cmx multiArray.cmx
@@ -267,7 +267,7 @@ clean_extlib.native:
 libs/extc/extc.ml: libs libs/extlib/extLib.cmxa
 
 libs/extc/extc.cmx: libs/extc/extc.ml libs/extlib/extLib.cmxa libs
-	cd libs/extc;  ocamlopt.opt -I /pr/tasks/haxe-git/libs/extlib  -I /pr/tasks/haxe-git/libs/extlib  -I /pr/tasks/haxe-git/libs/extlib -I /pr/tasks/haxe-git/libs/extlib -annot -g     -o extc.cmx -c extc.ml
+	cd libs/extc;  ocamlopt.opt -I ${CURDIR}/libs/extlib  -I ${CURDIR}/libs/extlib  -I ${CURDIR}/libs/extlib -I ${CURDIR}/libs/extlib -annot -g    -o extc.cmx -c extc.ml
 
 libs/extc/extc_stubs.c: libs libs/extlib/extLib.cmxa
 
@@ -286,27 +286,27 @@ clean_extc.native:
 libs/neko/nast.ml: libs libs/extlib/extLib.cmxa
 
 libs/neko/nast.cmx: libs/neko/nast.ml libs libs/extlib/extLib.cmxa
-	cd libs/neko;  ocamlopt.opt  -I /pr/tasks/haxe-git/libs/extlib  -I /pr/tasks/haxe-git/libs/extlib -annot -g     -o nast.cmx -c nast.ml
+	cd libs/neko;  ocamlopt.opt  -I ${CURDIR}/libs/extlib  -I ${CURDIR}/libs/extlib -annot -g    -o nast.cmx -c nast.ml
 
 libs/neko/nxml.ml: libs libs/extlib/extLib.cmxa
 
 libs/neko/nxml.cmx: libs/neko/nxml.ml libs/neko/nast.cmx libs libs/extlib/extLib.cmxa
-	cd libs/neko;  ocamlopt.opt  -I /pr/tasks/haxe-git/libs/extlib  -I /pr/tasks/haxe-git/libs/extlib -annot -g     -o nxml.cmx -c nxml.ml
+	cd libs/neko;  ocamlopt.opt  -I ${CURDIR}/libs/extlib  -I ${CURDIR}/libs/extlib -annot -g    -o nxml.cmx -c nxml.ml
 
 libs/neko/binast.ml: libs libs/extlib/extLib.cmxa
 
 libs/neko/binast.cmx: libs/neko/binast.ml libs/neko/nast.cmx libs libs/extlib/extLib.cmxa
-	cd libs/neko;  ocamlopt.opt  -I /pr/tasks/haxe-git/libs/extlib  -I /pr/tasks/haxe-git/libs/extlib -annot -g     -o binast.cmx -c binast.ml
+	cd libs/neko;  ocamlopt.opt  -I ${CURDIR}/libs/extlib  -I ${CURDIR}/libs/extlib -annot -g    -o binast.cmx -c binast.ml
 
 libs/neko/nbytecode.ml: libs libs/extlib/extLib.cmxa
 
 libs/neko/nbytecode.cmx: libs/neko/nbytecode.ml libs libs/extlib/extLib.cmxa
-	cd libs/neko;  ocamlopt.opt  -I /pr/tasks/haxe-git/libs/extlib  -I /pr/tasks/haxe-git/libs/extlib -annot -g     -o nbytecode.cmx -c nbytecode.ml
+	cd libs/neko;  ocamlopt.opt  -I ${CURDIR}/libs/extlib  -I ${CURDIR}/libs/extlib -annot -g    -o nbytecode.cmx -c nbytecode.ml
 
 libs/neko/ncompile.ml: libs libs/extlib/extLib.cmxa
 
 libs/neko/ncompile.cmx: libs/neko/ncompile.ml libs/neko/nbytecode.cmx libs libs/extlib/extLib.cmxa
-	cd libs/neko;  ocamlopt.opt  -I /pr/tasks/haxe-git/libs/extlib  -I /pr/tasks/haxe-git/libs/extlib -annot -g     -o ncompile.cmx -c ncompile.ml
+	cd libs/neko;  ocamlopt.opt  -I ${CURDIR}/libs/extlib  -I ${CURDIR}/libs/extlib -annot -g    -o ncompile.cmx -c ncompile.ml
 
 neko.native: libs libs/extlib/extLib.cmxa libs/neko/nast.cmx libs/neko/nxml.cmx libs/neko/binast.cmx libs/neko/nbytecode.cmx libs/neko/ncompile.cmx
 	cd libs/neko; ocamlopt.opt -a -o neko.cmxa nast.cmx nxml.cmx binast.cmx nbytecode.cmx ncompile.cmx
@@ -365,82 +365,82 @@ libs/ttflib/ttf.cmxa: ttflib
 ./ast.ml: libs/extc/extc.cmxa .git
 
 ./ast.cmx: ./ast.ml libs/extlib/extLib.cmxa libs/extc/extc.cmxa .git
-	cd .;  ocamlopt.opt -I /pr/tasks/haxe-git/libs/extlib -I /pr/tasks/haxe-git/libs/extc   -I /pr/tasks/haxe-git/libs/extc   -I /pr/tasks/haxe-git/libs/extlib -annot -g     -o ast.cmx -c ast.ml
+	cd .;  ocamlopt.opt -I ${CURDIR}/libs/extlib -I ${CURDIR}/libs/extc   -I ${CURDIR}/libs/extc   -I ${CURDIR}/libs/extlib -annot -g    -o ast.cmx -c ast.ml
 
 ./codegen.ml: libs/extc/extc.cmxa .git
 
 ./codegen.cmx: ./codegen.ml ./optimizer.cmx ./typeload.cmx ./typecore.cmx ./type.cmx ./genxml.cmx ./common.cmx ./ast.cmx libs/xml-light/xml-light.cmxa libs/extlib/extLib.cmxa libs/extc/extc.cmxa .git
-	cd .;  ocamlopt.opt -I /pr/tasks/haxe-git/libs/xml-light -I /pr/tasks/haxe-git/libs/extlib -I /pr/tasks/haxe-git/libs/extc   -I /pr/tasks/haxe-git/libs/extc   -I /pr/tasks/haxe-git/libs/xml-light -I /pr/tasks/haxe-git/libs/extlib -annot -g     -o codegen.cmx -c codegen.ml
+	cd .;  ocamlopt.opt -I ${CURDIR}/libs/xml-light -I ${CURDIR}/libs/extlib -I ${CURDIR}/libs/extc   -I ${CURDIR}/libs/extc   -I ${CURDIR}/libs/xml-light -I ${CURDIR}/libs/extlib -annot -g    -o codegen.cmx -c codegen.ml
 
 ./common.ml: libs/extc/extc.cmxa .git
 
 ./common.cmx: cppo/cppo ./common.ml ./type.cmx ./ast.cmx libs/extc/extc.cmxa libs/extlib/extLib.cmxa libs/xml-light/xml-light.cmxa .git
-	cd .;  ocamlopt.opt -I /pr/tasks/haxe-git/libs/extc -I /pr/tasks/haxe-git/libs/extlib -I /pr/tasks/haxe-git/libs/xml-light -I /pr/tasks/haxe-git/libs/extc   -I /pr/tasks/haxe-git/libs/extc   -I /pr/tasks/haxe-git/libs/extc -I /pr/tasks/haxe-git/libs/extlib -I /pr/tasks/haxe-git/libs/xml-light -annot -g   -pp '/pr/tasks/haxe-git/cppo/cppo $(if ${BACKEND_neko}, -D BACKEND_neko,)'  -o common.cmx -c common.ml
+	cd .;  ocamlopt.opt -I ${CURDIR}/libs/extc -I ${CURDIR}/libs/extlib -I ${CURDIR}/libs/xml-light -I ${CURDIR}/libs/extc   -I ${CURDIR}/libs/extc   -I ${CURDIR}/libs/extc -I ${CURDIR}/libs/extlib -I ${CURDIR}/libs/xml-light -annot -g  -pp '${CURDIR}/cppo/cppo $(if ${BACKEND_neko}, -D BACKEND_neko,)'  -o common.cmx -c common.ml
 
 ./dce.ml: libs/extc/extc.cmxa .git
 
 ./dce.cmx: ./dce.ml ./ast.cmx ./common.cmx ./type.cmx libs/extlib/extLib.cmxa libs/extc/extc.cmxa .git
-	cd .;  ocamlopt.opt -I /pr/tasks/haxe-git/libs/extlib -I /pr/tasks/haxe-git/libs/extc   -I /pr/tasks/haxe-git/libs/extc   -I /pr/tasks/haxe-git/libs/extlib -annot -g     -o dce.cmx -c dce.ml
+	cd .;  ocamlopt.opt -I ${CURDIR}/libs/extlib -I ${CURDIR}/libs/extc   -I ${CURDIR}/libs/extc   -I ${CURDIR}/libs/extlib -annot -g    -o dce.cmx -c dce.ml
 
 ./gencommon.ml: libs/extc/extc.cmxa .git
 
 ./gencommon.cmx: cppo/cppo ./gencommon.ml ./type.cmx ./common.cmx ./codegen.cmx ./ast.cmx libs/extlib/extLib.cmxa libs/extc/extc.cmxa .git
-	cd .;  ocamlopt.opt -I /pr/tasks/haxe-git/libs/extlib -I /pr/tasks/haxe-git/libs/extc   -I /pr/tasks/haxe-git/libs/extc   -I /pr/tasks/haxe-git/libs/extlib -annot -g   -pp '/pr/tasks/haxe-git/cppo/cppo $(if ${BACKEND_neko}, -D BACKEND_neko,)'  -o gencommon.cmx -c gencommon.ml
+	cd .;  ocamlopt.opt -I ${CURDIR}/libs/extlib -I ${CURDIR}/libs/extc   -I ${CURDIR}/libs/extc   -I ${CURDIR}/libs/extlib -annot -g  -pp '${CURDIR}/cppo/cppo $(if ${BACKEND_neko}, -D BACKEND_neko,)'  -o gencommon.cmx -c gencommon.ml
 
 ./genneko.ml: libs/extc/extc.cmxa .git
 
 ./genneko.cmx: ./genneko.ml ./type.cmx ./lexer.cmx ./common.cmx ./codegen.cmx ./ast.cmx libs/neko/neko.cmxa libs/extlib/extLib.cmxa libs/extc/extc.cmxa .git
-	cd .;  ocamlopt.opt -I /pr/tasks/haxe-git/libs/neko -I /pr/tasks/haxe-git/libs/extlib -I /pr/tasks/haxe-git/libs/extc   -I /pr/tasks/haxe-git/libs/extc   -I /pr/tasks/haxe-git/libs/neko -I /pr/tasks/haxe-git/libs/extlib -annot -g     -o genneko.cmx -c genneko.ml
+	cd .;  ocamlopt.opt -I ${CURDIR}/libs/neko -I ${CURDIR}/libs/extlib -I ${CURDIR}/libs/extc   -I ${CURDIR}/libs/extc   -I ${CURDIR}/libs/neko -I ${CURDIR}/libs/extlib -annot -g    -o genneko.cmx -c genneko.ml
 
 ./genxml.ml: libs/extc/extc.cmxa .git
 
 ./genxml.cmx: ./genxml.ml ./type.cmx ./lexer.cmx ./common.cmx ./ast.cmx libs/extlib/extLib.cmxa libs/extc/extc.cmxa .git
-	cd .;  ocamlopt.opt -I /pr/tasks/haxe-git/libs/extlib -I /pr/tasks/haxe-git/libs/extc   -I /pr/tasks/haxe-git/libs/extc   -I /pr/tasks/haxe-git/libs/extlib -annot -g     -o genxml.cmx -c genxml.ml
+	cd .;  ocamlopt.opt -I ${CURDIR}/libs/extlib -I ${CURDIR}/libs/extc   -I ${CURDIR}/libs/extc   -I ${CURDIR}/libs/extlib -annot -g    -o genxml.cmx -c genxml.ml
 
 ./interp.ml: libs/extc/extc.cmxa .git
 
 ./interp.cmx: cppo/cppo ./interp.ml ./typecore.cmx ./type.cmx ./lexer.cmx ./genneko.cmx ./common.cmx ./codegen.cmx ./ast.cmx ./parser.cmx libs/extlib/extLib.cmxa libs/extc/extc.cmxa libs/xml-light/xml-light.cmxa libs/neko/neko.cmxa .git
-	cd .;  ocamlopt.opt -I /pr/tasks/haxe-git/libs/extlib -I /pr/tasks/haxe-git/libs/extc -I /pr/tasks/haxe-git/libs/xml-light -I /pr/tasks/haxe-git/libs/neko -I /pr/tasks/haxe-git/libs/extc   -I /pr/tasks/haxe-git/libs/extc   -I /pr/tasks/haxe-git/libs/extlib -I /pr/tasks/haxe-git/libs/extc -I /pr/tasks/haxe-git/libs/xml-light -I /pr/tasks/haxe-git/libs/neko -annot -g   -pp '/pr/tasks/haxe-git/cppo/cppo $(if ${BACKEND_neko}, -D BACKEND_neko,)'  -o interp.cmx -c interp.ml
+	cd .;  ocamlopt.opt -I ${CURDIR}/libs/extlib -I ${CURDIR}/libs/extc -I ${CURDIR}/libs/xml-light -I ${CURDIR}/libs/neko -I ${CURDIR}/libs/extc   -I ${CURDIR}/libs/extc   -I ${CURDIR}/libs/extlib -I ${CURDIR}/libs/extc -I ${CURDIR}/libs/xml-light -I ${CURDIR}/libs/neko -annot -g  -pp '${CURDIR}/cppo/cppo $(if ${BACKEND_neko}, -D BACKEND_neko,)'  -o interp.cmx -c interp.ml
 
 ./matcher.ml: libs/extc/extc.cmxa .git
 
 ./matcher.cmx: ./matcher.ml ./optimizer.cmx ./codegen.cmx ./typecore.cmx ./type.cmx ./typer.cmx ./common.cmx ./ast.cmx libs/extlib/extLib.cmxa libs/extc/extc.cmxa .git
-	cd .;  ocamlopt.opt -I /pr/tasks/haxe-git/libs/extlib -I /pr/tasks/haxe-git/libs/extc   -I /pr/tasks/haxe-git/libs/extc   -I /pr/tasks/haxe-git/libs/extlib -annot -g     -o matcher.cmx -c matcher.ml
+	cd .;  ocamlopt.opt -I ${CURDIR}/libs/extlib -I ${CURDIR}/libs/extc   -I ${CURDIR}/libs/extc   -I ${CURDIR}/libs/extlib -annot -g    -o matcher.cmx -c matcher.ml
 
 ./main.ml: libs/extc/extc.cmxa .git
 
 ./main.cmx: cppo/cppo ./main.ml ./dce.cmx ./matcher.cmx ./typer.cmx ./typeload.cmx ./typecore.cmx ./type.cmx ./parser.cmx ./optimizer.cmx ./lexer.cmx ./interp.cmx ./genxml.cmx ./genneko.cmx ./common.cmx ./codegen.cmx ./ast.cmx ./gencommon.cmx libs/extlib/extLib.cmxa libs/extc/extc.cmxa .git
-	cd .;  ocamlopt.opt -I /pr/tasks/haxe-git/libs/extlib -I /pr/tasks/haxe-git/libs/extc -I /pr/tasks/haxe-git/libs/extc   -I /pr/tasks/haxe-git/libs/extc   -I /pr/tasks/haxe-git/libs/extlib -I /pr/tasks/haxe-git/libs/extc -annot -g   -pp '/pr/tasks/haxe-git/cppo/cppo $(if ${BACKEND_neko}, -D BACKEND_neko,)'  -o main.cmx -c main.ml
+	cd .;  ocamlopt.opt -I ${CURDIR}/libs/extlib -I ${CURDIR}/libs/extc -I ${CURDIR}/libs/extc   -I ${CURDIR}/libs/extc   -I ${CURDIR}/libs/extlib -I ${CURDIR}/libs/extc -annot -g  -pp '${CURDIR}/cppo/cppo $(if ${BACKEND_neko}, -D BACKEND_neko,)'  -o main.cmx -c main.ml
 
 ./optimizer.ml: libs/extc/extc.cmxa .git
 
 ./optimizer.cmx: ./optimizer.ml ./typecore.cmx ./type.cmx ./parser.cmx ./common.cmx ./ast.cmx libs/extlib/extLib.cmxa libs/extc/extc.cmxa .git
-	cd .;  ocamlopt.opt -I /pr/tasks/haxe-git/libs/extlib -I /pr/tasks/haxe-git/libs/extc   -I /pr/tasks/haxe-git/libs/extc   -I /pr/tasks/haxe-git/libs/extlib -annot -g     -o optimizer.cmx -c optimizer.ml
+	cd .;  ocamlopt.opt -I ${CURDIR}/libs/extlib -I ${CURDIR}/libs/extc   -I ${CURDIR}/libs/extc   -I ${CURDIR}/libs/extlib -annot -g    -o optimizer.cmx -c optimizer.ml
 
 ./parser.ml: libs/extc/extc.cmxa .git
 
 ./parser.cmx: ./parser.ml ./lexer.cmx ./common.cmx ./ast.cmx libs/extlib/extLib.cmxa libs/extc/extc.cmxa .git
-	cd .;  ocamlopt.opt -I /pr/tasks/haxe-git/libs/extlib -I /pr/tasks/haxe-git/libs/extc   -I /pr/tasks/haxe-git/libs/extc   -I /pr/tasks/haxe-git/libs/extlib -annot -g  -pp 'camlp4o '   -o parser.cmx -c parser.ml
+	cd .;  ocamlopt.opt -I ${CURDIR}/libs/extlib -I ${CURDIR}/libs/extc   -I ${CURDIR}/libs/extc   -I ${CURDIR}/libs/extlib -annot -g  -pp 'camlp4o '  -o parser.cmx -c parser.ml
 
 ./type.ml: libs/extc/extc.cmxa .git
 
 ./type.cmx: ./type.ml ./ast.cmx libs/extc/extc.cmxa libs/extlib/extLib.cmxa .git
-	cd .;  ocamlopt.opt -I /pr/tasks/haxe-git/libs/extc -I /pr/tasks/haxe-git/libs/extlib -I /pr/tasks/haxe-git/libs/extc   -I /pr/tasks/haxe-git/libs/extc   -I /pr/tasks/haxe-git/libs/extc -I /pr/tasks/haxe-git/libs/extlib -annot -g     -o type.cmx -c type.ml
+	cd .;  ocamlopt.opt -I ${CURDIR}/libs/extc -I ${CURDIR}/libs/extlib -I ${CURDIR}/libs/extc   -I ${CURDIR}/libs/extc   -I ${CURDIR}/libs/extc -I ${CURDIR}/libs/extlib -annot -g    -o type.cmx -c type.ml
 
 ./typecore.ml: libs/extc/extc.cmxa .git
 
 ./typecore.cmx: ./typecore.ml ./type.cmx ./common.cmx ./ast.cmx libs/extlib/extLib.cmxa libs/extc/extc.cmxa .git
-	cd .;  ocamlopt.opt -I /pr/tasks/haxe-git/libs/extlib -I /pr/tasks/haxe-git/libs/extc   -I /pr/tasks/haxe-git/libs/extc   -I /pr/tasks/haxe-git/libs/extlib -annot -g     -o typecore.cmx -c typecore.ml
+	cd .;  ocamlopt.opt -I ${CURDIR}/libs/extlib -I ${CURDIR}/libs/extc   -I ${CURDIR}/libs/extc   -I ${CURDIR}/libs/extlib -annot -g    -o typecore.cmx -c typecore.ml
 
 ./typeload.ml: libs/extc/extc.cmxa .git
 
 ./typeload.cmx: ./typeload.ml ./typecore.cmx ./type.cmx ./parser.cmx ./optimizer.cmx ./lexer.cmx ./common.cmx ./ast.cmx libs/extlib/extLib.cmxa libs/extc/extc.cmxa .git
-	cd .;  ocamlopt.opt -I /pr/tasks/haxe-git/libs/extlib -I /pr/tasks/haxe-git/libs/extc   -I /pr/tasks/haxe-git/libs/extc   -I /pr/tasks/haxe-git/libs/extlib -annot -g     -o typeload.cmx -c typeload.ml
+	cd .;  ocamlopt.opt -I ${CURDIR}/libs/extlib -I ${CURDIR}/libs/extc   -I ${CURDIR}/libs/extc   -I ${CURDIR}/libs/extlib -annot -g    -o typeload.cmx -c typeload.ml
 
 ./typer.ml: libs/extc/extc.cmxa .git
 
 ./typer.cmx: cppo/cppo ./typer.ml ./typeload.cmx ./typecore.cmx ./type.cmx ./parser.cmx ./optimizer.cmx ./lexer.cmx ./interp.cmx ./genneko.cmx ./common.cmx ./codegen.cmx ./ast.cmx libs/extlib/extLib.cmxa libs/extc/extc.cmxa .git
-	cd .;  ocamlopt.opt -I /pr/tasks/haxe-git/libs/extlib -I /pr/tasks/haxe-git/libs/extc   -I /pr/tasks/haxe-git/libs/extc   -I /pr/tasks/haxe-git/libs/extlib -annot -g   -pp '/pr/tasks/haxe-git/cppo/cppo $(if ${BACKEND_neko}, -D BACKEND_neko,)'  -o typer.cmx -c typer.ml
+	cd .;  ocamlopt.opt -I ${CURDIR}/libs/extlib -I ${CURDIR}/libs/extc   -I ${CURDIR}/libs/extc   -I ${CURDIR}/libs/extlib -annot -g  -pp '${CURDIR}/cppo/cppo $(if ${BACKEND_neko}, -D BACKEND_neko,)'  -o typer.cmx -c typer.ml
 
 ./lexer.ml: ./lexer.mll
 	cd .; ocamllex lexer.mll
@@ -448,10 +448,10 @@ libs/ttflib/ttf.cmxa: ttflib
 ./lexer.mll: libs/extc/extc.cmxa .git
 
 ./lexer.cmx: ./lexer.ml ./ast.cmx libs/extc/extc.cmxa .git
-	cd .;  ocamlopt.opt -I /pr/tasks/haxe-git/libs/extc   -I /pr/tasks/haxe-git/libs/extc   -annot -g     -o lexer.cmx -c lexer.ml
+	cd .;  ocamlopt.opt -I ${CURDIR}/libs/extc   -I ${CURDIR}/libs/extc   -annot -g    -o lexer.cmx -c lexer.ml
 
 haxe: libs/extlib/extLib.cmxa libs/xml-light/xml-light.cmxa libs/extc/extc.cmxa libs/neko/neko.cmxa .git ./ast.cmx ./codegen.cmx ./common.cmx ./dce.cmx ./gencommon.cmx ./genneko.cmx ./genxml.cmx ./interp.cmx ./matcher.cmx ./main.cmx ./optimizer.cmx ./parser.cmx ./type.cmx ./typecore.cmx ./typeload.cmx ./typer.cmx ./lexer.cmx
-	cd .; ocamlopt.opt  -g -o haxe -I /pr/tasks/haxe-git/libs/extlib extLib.cmxa -cclib libs/extc/extc_stubs.o -cclib -lz libs/xml-light/xml-light.cmxa -I /pr/tasks/haxe-git/libs/extc extc.cmxa -I /pr/tasks/haxe-git/libs/neko neko.cmxa unix.cmxa str.cmxa ast.cmx type.cmx common.cmx dce.cmx typecore.cmx lexer.cmx parser.cmx optimizer.cmx typeload.cmx genxml.cmx codegen.cmx genneko.cmx interp.cmx typer.cmx matcher.cmx gencommon.cmx main.cmx
+	cd .; ocamlopt.opt  -g -o haxe -I ${CURDIR}/libs/extlib extLib.cmxa -cclib libs/extc/extc_stubs.o -cclib -lz libs/xml-light/xml-light.cmxa -I ${CURDIR}/libs/extc extc.cmxa -I ${CURDIR}/libs/neko neko.cmxa unix.cmxa str.cmxa ast.cmx type.cmx common.cmx dce.cmx typecore.cmx lexer.cmx parser.cmx optimizer.cmx typeload.cmx genxml.cmx codegen.cmx genneko.cmx interp.cmx typer.cmx matcher.cmx gencommon.cmx main.cmx
 
 ./haxe: haxe
 
@@ -460,7 +460,7 @@ clean_haxe:
 
 
 trace/tracetest.cmo: trace/tracetest.ml
-	cd trace;  ocamlc.opt  -annot -g     -o tracetest.cmo -c tracetest.ml
+	cd trace;  ocamlc.opt  -annot -g    -o tracetest.cmo -c tracetest.ml
 
 tracetest.byte: trace/tracetest.cmo
 	cd trace; ocamlc.opt -custom -g -o tracetest.byte tracetest.cmo
@@ -472,64 +472,64 @@ clean_tracetest.byte:
 
 
 libs/extlib/enum.cmo: libs/extlib/enum.ml libs/extlib/enum.cmi libs
-	cd libs/extlib;  ocamlc.opt   -annot -g     -o enum.cmo -c enum.ml
+	cd libs/extlib;  ocamlc.opt   -annot -g    -o enum.cmo -c enum.ml
 
 libs/extlib/bitSet.cmo: libs/extlib/bitSet.ml libs/extlib/bitSet.cmi libs
-	cd libs/extlib;  ocamlc.opt   -annot -g     -o bitSet.cmo -c bitSet.ml
+	cd libs/extlib;  ocamlc.opt   -annot -g    -o bitSet.cmo -c bitSet.ml
 
 libs/extlib/dynArray.cmo: libs/extlib/dynArray.ml libs/extlib/dynArray.cmi libs
-	cd libs/extlib;  ocamlc.opt   -annot -g     -o dynArray.cmo -c dynArray.ml
+	cd libs/extlib;  ocamlc.opt   -annot -g    -o dynArray.cmo -c dynArray.ml
 
 libs/extlib/extArray.cmo: libs/extlib/extArray.ml libs/extlib/extArray.cmi libs
-	cd libs/extlib;  ocamlc.opt   -annot -g     -o extArray.cmo -c extArray.ml
+	cd libs/extlib;  ocamlc.opt   -annot -g    -o extArray.cmo -c extArray.ml
 
 libs/extlib/extHashtbl.cmo: libs/extlib/extHashtbl.ml libs/extlib/extHashtbl.cmi libs
-	cd libs/extlib;  ocamlc.opt   -annot -g     -o extHashtbl.cmo -c extHashtbl.ml
+	cd libs/extlib;  ocamlc.opt   -annot -g    -o extHashtbl.cmo -c extHashtbl.ml
 
 libs/extlib/extList.cmo: libs/extlib/extList.ml libs/extlib/extList.cmi libs
-	cd libs/extlib;  ocamlc.opt   -annot -g     -o extList.cmo -c extList.ml
+	cd libs/extlib;  ocamlc.opt   -annot -g    -o extList.cmo -c extList.ml
 
 libs/extlib/extString.cmo: libs/extlib/extString.ml libs/extlib/extString.cmi libs
-	cd libs/extlib;  ocamlc.opt   -annot -g     -o extString.cmo -c extString.ml
+	cd libs/extlib;  ocamlc.opt   -annot -g    -o extString.cmo -c extString.ml
 
 libs/extlib/global.cmo: libs/extlib/global.ml libs/extlib/global.cmi libs
-	cd libs/extlib;  ocamlc.opt   -annot -g     -o global.cmo -c global.ml
+	cd libs/extlib;  ocamlc.opt   -annot -g    -o global.cmo -c global.ml
 
 libs/extlib/IO.cmo: libs/extlib/IO.ml libs/extlib/IO.cmi libs
-	cd libs/extlib;  ocamlc.opt   -annot -g     -o IO.cmo -c IO.ml
+	cd libs/extlib;  ocamlc.opt   -annot -g    -o IO.cmo -c IO.ml
 
 libs/extlib/option.cmo: libs/extlib/option.ml libs/extlib/option.cmi libs
-	cd libs/extlib;  ocamlc.opt   -annot -g     -o option.cmo -c option.ml
+	cd libs/extlib;  ocamlc.opt   -annot -g    -o option.cmo -c option.ml
 
 libs/extlib/pMap.cmo: libs/extlib/pMap.ml libs/extlib/pMap.cmi libs
-	cd libs/extlib;  ocamlc.opt   -annot -g     -o pMap.cmo -c pMap.ml
+	cd libs/extlib;  ocamlc.opt   -annot -g    -o pMap.cmo -c pMap.ml
 
 libs/extlib/std.cmo: libs/extlib/std.ml libs/extlib/std.cmi libs
-	cd libs/extlib;  ocamlc.opt   -annot -g     -o std.cmo -c std.ml
+	cd libs/extlib;  ocamlc.opt   -annot -g    -o std.cmo -c std.ml
 
 libs/extlib/uChar.cmo: libs/extlib/uChar.ml libs/extlib/uChar.cmi libs
-	cd libs/extlib;  ocamlc.opt   -annot -g     -o uChar.cmo -c uChar.ml
+	cd libs/extlib;  ocamlc.opt   -annot -g    -o uChar.cmo -c uChar.ml
 
 libs/extlib/uTF8.cmo: libs/extlib/uTF8.ml libs/extlib/uTF8.cmi libs
-	cd libs/extlib;  ocamlc.opt   -annot -g     -o uTF8.cmo -c uTF8.ml
+	cd libs/extlib;  ocamlc.opt   -annot -g    -o uTF8.cmo -c uTF8.ml
 
 libs/extlib/base64.cmo: libs/extlib/base64.ml libs/extlib/base64.cmi libs
-	cd libs/extlib;  ocamlc.opt   -annot -g     -o base64.cmo -c base64.ml
+	cd libs/extlib;  ocamlc.opt   -annot -g    -o base64.cmo -c base64.ml
 
 libs/extlib/unzip.cmo: libs/extlib/unzip.ml libs/extlib/unzip.cmi libs
-	cd libs/extlib;  ocamlc.opt   -annot -g     -o unzip.cmo -c unzip.ml
+	cd libs/extlib;  ocamlc.opt   -annot -g    -o unzip.cmo -c unzip.ml
 
 libs/extlib/refList.cmo: libs/extlib/refList.ml libs/extlib/refList.cmi libs
-	cd libs/extlib;  ocamlc.opt   -annot -g     -o refList.cmo -c refList.ml
+	cd libs/extlib;  ocamlc.opt   -annot -g    -o refList.cmo -c refList.ml
 
 libs/extlib/optParse.cmo: libs/extlib/optParse.ml libs/extlib/optParse.cmi libs
-	cd libs/extlib;  ocamlc.opt   -annot -g     -o optParse.cmo -c optParse.ml
+	cd libs/extlib;  ocamlc.opt   -annot -g    -o optParse.cmo -c optParse.ml
 
 libs/extlib/dllist.cmo: libs/extlib/dllist.ml libs/extlib/dllist.cmi libs
-	cd libs/extlib;  ocamlc.opt   -annot -g     -o dllist.cmo -c dllist.ml
+	cd libs/extlib;  ocamlc.opt   -annot -g    -o dllist.cmo -c dllist.ml
 
 libs/extlib/multiArray.cmo: libs/extlib/multiArray.ml libs/extlib/multiArray.cmi libs
-	cd libs/extlib;  ocamlc.opt   -annot -g     -o multiArray.cmo -c multiArray.ml
+	cd libs/extlib;  ocamlc.opt   -annot -g    -o multiArray.cmo -c multiArray.ml
 
 extlib.bytecode: libs libs/extlib/enum.cmo libs/extlib/bitSet.cmo libs/extlib/dynArray.cmo libs/extlib/extArray.cmo libs/extlib/extHashtbl.cmo libs/extlib/extList.cmo libs/extlib/extString.cmo libs/extlib/global.cmo libs/extlib/IO.cmo libs/extlib/option.cmo libs/extlib/pMap.cmo libs/extlib/std.cmo libs/extlib/uChar.cmo libs/extlib/uTF8.cmo libs/extlib/base64.cmo libs/extlib/unzip.cmo libs/extlib/refList.cmo libs/extlib/optParse.cmo libs/extlib/dllist.cmo libs/extlib/multiArray.cmo libs/extlib/enum.cmi libs/extlib/bitSet.cmi libs/extlib/dynArray.cmi libs/extlib/extArray.cmi libs/extlib/extHashtbl.cmi libs/extlib/extList.cmi libs/extlib/extString.cmi libs/extlib/global.cmi libs/extlib/IO.cmi libs/extlib/option.cmi libs/extlib/pMap.cmi libs/extlib/std.cmi libs/extlib/uChar.cmi libs/extlib/uTF8.cmi libs/extlib/base64.cmi libs/extlib/unzip.cmi libs/extlib/refList.cmi libs/extlib/optParse.cmi libs/extlib/dllist.cmi libs/extlib/multiArray.cmi
 	cd libs/extlib; ocamlc.opt -a -o extLib.cma enum.cmo dynArray.cmo bitSet.cmo extArray.cmo extHashtbl.cmo global.cmo pMap.cmo std.cmo uChar.cmo uTF8.cmo extString.cmo IO.cmo base64.cmo unzip.cmo option.cmo extList.cmo refList.cmo optParse.cmo dllist.cmo multiArray.cmo
@@ -541,7 +541,7 @@ clean_extlib.bytecode:
 
 
 libs/extc/extc.cmo: libs/extc/extc.ml libs/extlib/extLib.cma libs
-	cd libs/extc;  ocamlc.opt -I /pr/tasks/haxe-git/libs/extlib  -I /pr/tasks/haxe-git/libs/extlib  -I /pr/tasks/haxe-git/libs/extlib -I /pr/tasks/haxe-git/libs/extlib -annot -g     -o extc.cmo -c extc.ml
+	cd libs/extc;  ocamlc.opt -I ${CURDIR}/libs/extlib  -I ${CURDIR}/libs/extlib  -I ${CURDIR}/libs/extlib -I ${CURDIR}/libs/extlib -annot -g    -o extc.cmo -c extc.ml
 
 extc.bytecode: libs/extlib/extLib.cma libs libs/extc/extc.cmo libs/extc/extc_stubs.o
 	cd libs/extc; ocamlc.opt -a -o extc.cma extc.cmo
@@ -553,19 +553,19 @@ clean_extc.bytecode:
 
 
 libs/neko/nast.cmo: libs/neko/nast.ml libs libs/extlib/extLib.cma
-	cd libs/neko;  ocamlc.opt  -I /pr/tasks/haxe-git/libs/extlib  -I /pr/tasks/haxe-git/libs/extlib -annot -g     -o nast.cmo -c nast.ml
+	cd libs/neko;  ocamlc.opt  -I ${CURDIR}/libs/extlib  -I ${CURDIR}/libs/extlib -annot -g    -o nast.cmo -c nast.ml
 
 libs/neko/nxml.cmo: libs/neko/nxml.ml libs/neko/nast.cmo libs libs/extlib/extLib.cma
-	cd libs/neko;  ocamlc.opt  -I /pr/tasks/haxe-git/libs/extlib  -I /pr/tasks/haxe-git/libs/extlib -annot -g     -o nxml.cmo -c nxml.ml
+	cd libs/neko;  ocamlc.opt  -I ${CURDIR}/libs/extlib  -I ${CURDIR}/libs/extlib -annot -g    -o nxml.cmo -c nxml.ml
 
 libs/neko/binast.cmo: libs/neko/binast.ml libs/neko/nast.cmo libs libs/extlib/extLib.cma
-	cd libs/neko;  ocamlc.opt  -I /pr/tasks/haxe-git/libs/extlib  -I /pr/tasks/haxe-git/libs/extlib -annot -g     -o binast.cmo -c binast.ml
+	cd libs/neko;  ocamlc.opt  -I ${CURDIR}/libs/extlib  -I ${CURDIR}/libs/extlib -annot -g    -o binast.cmo -c binast.ml
 
 libs/neko/nbytecode.cmo: libs/neko/nbytecode.ml libs libs/extlib/extLib.cma
-	cd libs/neko;  ocamlc.opt  -I /pr/tasks/haxe-git/libs/extlib  -I /pr/tasks/haxe-git/libs/extlib -annot -g     -o nbytecode.cmo -c nbytecode.ml
+	cd libs/neko;  ocamlc.opt  -I ${CURDIR}/libs/extlib  -I ${CURDIR}/libs/extlib -annot -g    -o nbytecode.cmo -c nbytecode.ml
 
 libs/neko/ncompile.cmo: libs/neko/ncompile.ml libs/neko/nbytecode.cmo libs libs/extlib/extLib.cma
-	cd libs/neko;  ocamlc.opt  -I /pr/tasks/haxe-git/libs/extlib  -I /pr/tasks/haxe-git/libs/extlib -annot -g     -o ncompile.cmo -c ncompile.ml
+	cd libs/neko;  ocamlc.opt  -I ${CURDIR}/libs/extlib  -I ${CURDIR}/libs/extlib -annot -g    -o ncompile.cmo -c ncompile.ml
 
 neko.bytecode: libs libs/extlib/extLib.cma libs/neko/nast.cmo libs/neko/nxml.cmo libs/neko/binast.cmo libs/neko/nbytecode.cmo libs/neko/ncompile.cmo
 	cd libs/neko; ocamlc.opt -a -o neko.cma nast.cmo nxml.cmo binast.cmo nbytecode.cmo ncompile.cmo
@@ -597,58 +597,58 @@ libs/ttflib/ttf.cma:
 	touch libs/ttflib/ttf.cma
 
 ./ast.cmo: ./ast.ml libs/extlib/extLib.cma libs/extc/extc.cma .git
-	cd .;  ocamlc.opt -I /pr/tasks/haxe-git/libs/extlib -I /pr/tasks/haxe-git/libs/extc   -I /pr/tasks/haxe-git/libs/extc   -I /pr/tasks/haxe-git/libs/extlib -annot -g     -o ast.cmo -c ast.ml
+	cd .;  ocamlc.opt -I ${CURDIR}/libs/extlib -I ${CURDIR}/libs/extc   -I ${CURDIR}/libs/extc   -I ${CURDIR}/libs/extlib -annot -g    -o ast.cmo -c ast.ml
 
 ./codegen.cmo: ./codegen.ml ./optimizer.cmo ./typeload.cmo ./typecore.cmo ./type.cmo ./genxml.cmo ./common.cmo ./ast.cmo libs/xml-light/xml-light.cma libs/extlib/extLib.cma libs/extc/extc.cma .git
-	cd .;  ocamlc.opt -I /pr/tasks/haxe-git/libs/xml-light -I /pr/tasks/haxe-git/libs/extlib -I /pr/tasks/haxe-git/libs/extc   -I /pr/tasks/haxe-git/libs/extc   -I /pr/tasks/haxe-git/libs/xml-light -I /pr/tasks/haxe-git/libs/extlib -annot -g     -o codegen.cmo -c codegen.ml
+	cd .;  ocamlc.opt -I ${CURDIR}/libs/xml-light -I ${CURDIR}/libs/extlib -I ${CURDIR}/libs/extc   -I ${CURDIR}/libs/extc   -I ${CURDIR}/libs/xml-light -I ${CURDIR}/libs/extlib -annot -g    -o codegen.cmo -c codegen.ml
 
 ./common.cmo: cppo/cppo ./common.ml ./type.cmo ./ast.cmo libs/extc/extc.cma libs/extlib/extLib.cma libs/xml-light/xml-light.cma .git
-	cd .;  ocamlc.opt -I /pr/tasks/haxe-git/libs/extc -I /pr/tasks/haxe-git/libs/extlib -I /pr/tasks/haxe-git/libs/xml-light -I /pr/tasks/haxe-git/libs/extc   -I /pr/tasks/haxe-git/libs/extc   -I /pr/tasks/haxe-git/libs/extc -I /pr/tasks/haxe-git/libs/extlib -I /pr/tasks/haxe-git/libs/xml-light -annot -g   -pp '/pr/tasks/haxe-git/cppo/cppo $(if ${BACKEND_neko}, -D BACKEND_neko,)'  -o common.cmo -c common.ml
+	cd .;  ocamlc.opt -I ${CURDIR}/libs/extc -I ${CURDIR}/libs/extlib -I ${CURDIR}/libs/xml-light -I ${CURDIR}/libs/extc   -I ${CURDIR}/libs/extc   -I ${CURDIR}/libs/extc -I ${CURDIR}/libs/extlib -I ${CURDIR}/libs/xml-light -annot -g  -pp '${CURDIR}/cppo/cppo $(if ${BACKEND_neko}, -D BACKEND_neko,)'  -o common.cmo -c common.ml
 
 ./dce.cmo: ./dce.ml ./ast.cmo ./common.cmo ./type.cmo libs/extlib/extLib.cma libs/extc/extc.cma .git
-	cd .;  ocamlc.opt -I /pr/tasks/haxe-git/libs/extlib -I /pr/tasks/haxe-git/libs/extc   -I /pr/tasks/haxe-git/libs/extc   -I /pr/tasks/haxe-git/libs/extlib -annot -g     -o dce.cmo -c dce.ml
+	cd .;  ocamlc.opt -I ${CURDIR}/libs/extlib -I ${CURDIR}/libs/extc   -I ${CURDIR}/libs/extc   -I ${CURDIR}/libs/extlib -annot -g    -o dce.cmo -c dce.ml
 
 ./gencommon.cmo: cppo/cppo ./gencommon.ml ./type.cmo ./common.cmo ./codegen.cmo ./ast.cmo libs/extlib/extLib.cma libs/extc/extc.cma .git
-	cd .;  ocamlc.opt -I /pr/tasks/haxe-git/libs/extlib -I /pr/tasks/haxe-git/libs/extc   -I /pr/tasks/haxe-git/libs/extc   -I /pr/tasks/haxe-git/libs/extlib -annot -g   -pp '/pr/tasks/haxe-git/cppo/cppo $(if ${BACKEND_neko}, -D BACKEND_neko,)'  -o gencommon.cmo -c gencommon.ml
+	cd .;  ocamlc.opt -I ${CURDIR}/libs/extlib -I ${CURDIR}/libs/extc   -I ${CURDIR}/libs/extc   -I ${CURDIR}/libs/extlib -annot -g  -pp '${CURDIR}/cppo/cppo $(if ${BACKEND_neko}, -D BACKEND_neko,)'  -o gencommon.cmo -c gencommon.ml
 
 ./genneko.cmo: ./genneko.ml ./type.cmo ./lexer.cmo ./common.cmo ./codegen.cmo ./ast.cmo libs/neko/neko.cma libs/extlib/extLib.cma libs/extc/extc.cma .git
-	cd .;  ocamlc.opt -I /pr/tasks/haxe-git/libs/neko -I /pr/tasks/haxe-git/libs/extlib -I /pr/tasks/haxe-git/libs/extc   -I /pr/tasks/haxe-git/libs/extc   -I /pr/tasks/haxe-git/libs/neko -I /pr/tasks/haxe-git/libs/extlib -annot -g     -o genneko.cmo -c genneko.ml
+	cd .;  ocamlc.opt -I ${CURDIR}/libs/neko -I ${CURDIR}/libs/extlib -I ${CURDIR}/libs/extc   -I ${CURDIR}/libs/extc   -I ${CURDIR}/libs/neko -I ${CURDIR}/libs/extlib -annot -g    -o genneko.cmo -c genneko.ml
 
 ./genxml.cmo: ./genxml.ml ./type.cmo ./lexer.cmo ./common.cmo ./ast.cmo libs/extlib/extLib.cma libs/extc/extc.cma .git
-	cd .;  ocamlc.opt -I /pr/tasks/haxe-git/libs/extlib -I /pr/tasks/haxe-git/libs/extc   -I /pr/tasks/haxe-git/libs/extc   -I /pr/tasks/haxe-git/libs/extlib -annot -g     -o genxml.cmo -c genxml.ml
+	cd .;  ocamlc.opt -I ${CURDIR}/libs/extlib -I ${CURDIR}/libs/extc   -I ${CURDIR}/libs/extc   -I ${CURDIR}/libs/extlib -annot -g    -o genxml.cmo -c genxml.ml
 
 ./interp.cmo: cppo/cppo ./interp.ml ./typecore.cmo ./type.cmo ./lexer.cmo ./genneko.cmo ./common.cmo ./codegen.cmo ./ast.cmo ./parser.cmo libs/extlib/extLib.cma libs/extc/extc.cma libs/xml-light/xml-light.cma libs/neko/neko.cma .git
-	cd .;  ocamlc.opt -I /pr/tasks/haxe-git/libs/extlib -I /pr/tasks/haxe-git/libs/extc -I /pr/tasks/haxe-git/libs/xml-light -I /pr/tasks/haxe-git/libs/neko -I /pr/tasks/haxe-git/libs/extc   -I /pr/tasks/haxe-git/libs/extc   -I /pr/tasks/haxe-git/libs/extlib -I /pr/tasks/haxe-git/libs/extc -I /pr/tasks/haxe-git/libs/xml-light -I /pr/tasks/haxe-git/libs/neko -annot -g   -pp '/pr/tasks/haxe-git/cppo/cppo $(if ${BACKEND_neko}, -D BACKEND_neko,)'  -o interp.cmo -c interp.ml
+	cd .;  ocamlc.opt -I ${CURDIR}/libs/extlib -I ${CURDIR}/libs/extc -I ${CURDIR}/libs/xml-light -I ${CURDIR}/libs/neko -I ${CURDIR}/libs/extc   -I ${CURDIR}/libs/extc   -I ${CURDIR}/libs/extlib -I ${CURDIR}/libs/extc -I ${CURDIR}/libs/xml-light -I ${CURDIR}/libs/neko -annot -g  -pp '${CURDIR}/cppo/cppo $(if ${BACKEND_neko}, -D BACKEND_neko,)'  -o interp.cmo -c interp.ml
 
 ./matcher.cmo: ./matcher.ml ./optimizer.cmo ./codegen.cmo ./typecore.cmo ./type.cmo ./typer.cmo ./common.cmo ./ast.cmo libs/extlib/extLib.cma libs/extc/extc.cma .git
-	cd .;  ocamlc.opt -I /pr/tasks/haxe-git/libs/extlib -I /pr/tasks/haxe-git/libs/extc   -I /pr/tasks/haxe-git/libs/extc   -I /pr/tasks/haxe-git/libs/extlib -annot -g     -o matcher.cmo -c matcher.ml
+	cd .;  ocamlc.opt -I ${CURDIR}/libs/extlib -I ${CURDIR}/libs/extc   -I ${CURDIR}/libs/extc   -I ${CURDIR}/libs/extlib -annot -g    -o matcher.cmo -c matcher.ml
 
 ./main.cmo: cppo/cppo ./main.ml ./dce.cmo ./matcher.cmo ./typer.cmo ./typeload.cmo ./typecore.cmo ./type.cmo ./parser.cmo ./optimizer.cmo ./lexer.cmo ./interp.cmo ./genxml.cmo ./genneko.cmo ./common.cmo ./codegen.cmo ./ast.cmo ./gencommon.cmo libs/extlib/extLib.cma libs/extc/extc.cma .git
-	cd .;  ocamlc.opt -I /pr/tasks/haxe-git/libs/extlib -I /pr/tasks/haxe-git/libs/extc -I /pr/tasks/haxe-git/libs/extc   -I /pr/tasks/haxe-git/libs/extc   -I /pr/tasks/haxe-git/libs/extlib -I /pr/tasks/haxe-git/libs/extc -annot -g   -pp '/pr/tasks/haxe-git/cppo/cppo $(if ${BACKEND_neko}, -D BACKEND_neko,)'  -o main.cmo -c main.ml
+	cd .;  ocamlc.opt -I ${CURDIR}/libs/extlib -I ${CURDIR}/libs/extc -I ${CURDIR}/libs/extc   -I ${CURDIR}/libs/extc   -I ${CURDIR}/libs/extlib -I ${CURDIR}/libs/extc -annot -g  -pp '${CURDIR}/cppo/cppo $(if ${BACKEND_neko}, -D BACKEND_neko,)'  -o main.cmo -c main.ml
 
 ./optimizer.cmo: ./optimizer.ml ./typecore.cmo ./type.cmo ./parser.cmo ./common.cmo ./ast.cmo libs/extlib/extLib.cma libs/extc/extc.cma .git
-	cd .;  ocamlc.opt -I /pr/tasks/haxe-git/libs/extlib -I /pr/tasks/haxe-git/libs/extc   -I /pr/tasks/haxe-git/libs/extc   -I /pr/tasks/haxe-git/libs/extlib -annot -g     -o optimizer.cmo -c optimizer.ml
+	cd .;  ocamlc.opt -I ${CURDIR}/libs/extlib -I ${CURDIR}/libs/extc   -I ${CURDIR}/libs/extc   -I ${CURDIR}/libs/extlib -annot -g    -o optimizer.cmo -c optimizer.ml
 
 ./parser.cmo: ./parser.ml ./lexer.cmo ./common.cmo ./ast.cmo libs/extlib/extLib.cma libs/extc/extc.cma .git
-	cd .;  ocamlc.opt -I /pr/tasks/haxe-git/libs/extlib -I /pr/tasks/haxe-git/libs/extc   -I /pr/tasks/haxe-git/libs/extc   -I /pr/tasks/haxe-git/libs/extlib -annot -g  -pp 'camlp4o '   -o parser.cmo -c parser.ml
+	cd .;  ocamlc.opt -I ${CURDIR}/libs/extlib -I ${CURDIR}/libs/extc   -I ${CURDIR}/libs/extc   -I ${CURDIR}/libs/extlib -annot -g  -pp 'camlp4o '  -o parser.cmo -c parser.ml
 
 ./type.cmo: ./type.ml ./ast.cmo libs/extc/extc.cma libs/extlib/extLib.cma .git
-	cd .;  ocamlc.opt -I /pr/tasks/haxe-git/libs/extc -I /pr/tasks/haxe-git/libs/extlib -I /pr/tasks/haxe-git/libs/extc   -I /pr/tasks/haxe-git/libs/extc   -I /pr/tasks/haxe-git/libs/extc -I /pr/tasks/haxe-git/libs/extlib -annot -g     -o type.cmo -c type.ml
+	cd .;  ocamlc.opt -I ${CURDIR}/libs/extc -I ${CURDIR}/libs/extlib -I ${CURDIR}/libs/extc   -I ${CURDIR}/libs/extc   -I ${CURDIR}/libs/extc -I ${CURDIR}/libs/extlib -annot -g    -o type.cmo -c type.ml
 
 ./typecore.cmo: ./typecore.ml ./type.cmo ./common.cmo ./ast.cmo libs/extlib/extLib.cma libs/extc/extc.cma .git
-	cd .;  ocamlc.opt -I /pr/tasks/haxe-git/libs/extlib -I /pr/tasks/haxe-git/libs/extc   -I /pr/tasks/haxe-git/libs/extc   -I /pr/tasks/haxe-git/libs/extlib -annot -g     -o typecore.cmo -c typecore.ml
+	cd .;  ocamlc.opt -I ${CURDIR}/libs/extlib -I ${CURDIR}/libs/extc   -I ${CURDIR}/libs/extc   -I ${CURDIR}/libs/extlib -annot -g    -o typecore.cmo -c typecore.ml
 
 ./typeload.cmo: ./typeload.ml ./typecore.cmo ./type.cmo ./parser.cmo ./optimizer.cmo ./lexer.cmo ./common.cmo ./ast.cmo libs/extlib/extLib.cma libs/extc/extc.cma .git
-	cd .;  ocamlc.opt -I /pr/tasks/haxe-git/libs/extlib -I /pr/tasks/haxe-git/libs/extc   -I /pr/tasks/haxe-git/libs/extc   -I /pr/tasks/haxe-git/libs/extlib -annot -g     -o typeload.cmo -c typeload.ml
+	cd .;  ocamlc.opt -I ${CURDIR}/libs/extlib -I ${CURDIR}/libs/extc   -I ${CURDIR}/libs/extc   -I ${CURDIR}/libs/extlib -annot -g    -o typeload.cmo -c typeload.ml
 
 ./typer.cmo: cppo/cppo ./typer.ml ./typeload.cmo ./typecore.cmo ./type.cmo ./parser.cmo ./optimizer.cmo ./lexer.cmo ./interp.cmo ./genneko.cmo ./common.cmo ./codegen.cmo ./ast.cmo libs/extlib/extLib.cma libs/extc/extc.cma .git
-	cd .;  ocamlc.opt -I /pr/tasks/haxe-git/libs/extlib -I /pr/tasks/haxe-git/libs/extc   -I /pr/tasks/haxe-git/libs/extc   -I /pr/tasks/haxe-git/libs/extlib -annot -g   -pp '/pr/tasks/haxe-git/cppo/cppo $(if ${BACKEND_neko}, -D BACKEND_neko,)'  -o typer.cmo -c typer.ml
+	cd .;  ocamlc.opt -I ${CURDIR}/libs/extlib -I ${CURDIR}/libs/extc   -I ${CURDIR}/libs/extc   -I ${CURDIR}/libs/extlib -annot -g  -pp '${CURDIR}/cppo/cppo $(if ${BACKEND_neko}, -D BACKEND_neko,)'  -o typer.cmo -c typer.ml
 
 ./lexer.cmo: ./lexer.ml ./ast.cmo libs/extc/extc.cma .git
-	cd .;  ocamlc.opt -I /pr/tasks/haxe-git/libs/extc   -I /pr/tasks/haxe-git/libs/extc   -annot -g     -o lexer.cmo -c lexer.ml
+	cd .;  ocamlc.opt -I ${CURDIR}/libs/extc   -I ${CURDIR}/libs/extc   -annot -g    -o lexer.cmo -c lexer.ml
 
 haxe.byte: libs/extlib/extLib.cma libs/xml-light/xml-light.cma libs/extc/extc.cma libs/neko/neko.cma .git ./ast.cmo ./codegen.cmo ./common.cmo ./dce.cmo ./gencommon.cmo ./genneko.cmo ./genxml.cmo ./interp.cmo ./matcher.cmo ./main.cmo ./optimizer.cmo ./parser.cmo ./type.cmo ./typecore.cmo ./typeload.cmo ./typer.cmo ./lexer.cmo
-	cd .; ocamlc.opt -custom -g -o haxe.byte -I /pr/tasks/haxe-git/libs/extlib extLib.cma -cclib libs/extc/extc_stubs.o -cclib -lz libs/xml-light/xml-light.cma -I /pr/tasks/haxe-git/libs/extc extc.cma -I /pr/tasks/haxe-git/libs/neko neko.cma unix.cma str.cma ast.cmo type.cmo common.cmo dce.cmo typecore.cmo lexer.cmo parser.cmo optimizer.cmo typeload.cmo genxml.cmo codegen.cmo genneko.cmo interp.cmo typer.cmo matcher.cmo gencommon.cmo main.cmo
+	cd .; ocamlc.opt -custom -g -o haxe.byte -I ${CURDIR}/libs/extlib extLib.cma -cclib libs/extc/extc_stubs.o -cclib -lz libs/xml-light/xml-light.cma -I ${CURDIR}/libs/extc extc.cma -I ${CURDIR}/libs/neko neko.cma unix.cma str.cma ast.cmo type.cmo common.cmo dce.cmo typecore.cmo lexer.cmo parser.cmo optimizer.cmo typeload.cmo genxml.cmo codegen.cmo genneko.cmo interp.cmo typer.cmo matcher.cmo gencommon.cmo main.cmo
 
 ./haxe.byte: haxe.byte
 

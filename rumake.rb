@@ -1,6 +1,7 @@
 # encoding: UTF-8
 
 require_relative "rumake/lib/rumake/task.rb"
+
 module Rumake
   class Task
     alias :init :initialize
@@ -158,7 +159,7 @@ class LibMake
       aliases = [@name.to_sym]
     end
 
-    Rumake::Tasks::File.new ({
+    Rumake::Tasks::File.new({
       :files => [main_target],
       :aliases => aliases,
       :prerqs => ["libs"] + @o[:depends_on],
@@ -218,9 +219,9 @@ class OcamlCC
 
       use_camlp4 = camlp4
       # you can uncomment the hack above and comment the cppo line below
-      cmd_cppo = 
+      cmd_cppo = \
        use_cppo \
-       ? "#{cppo_executable_fun.call} #{cppo_flags.join(' ')}"
+       ? "#{cppo_executable_fun.call} #{cppo_flags.join(' ')}" \
        : nil
 
       cmd_camlp4 = 
@@ -477,7 +478,7 @@ class OcamlBuildable
       if file_o[:ocamllex]
         src = "#{o[:base_dir]}/#{file}l"
         once file do
-          Rumake::Tasks::File.new ({
+          Rumake::Tasks::File.new({
             :files => ["#{o[:base_dir]}/#{file}"],
             :prereqs => ["#{o[:base_dir]}/#{file}l"],
             :shell_commands => ["cd #{o[:base_dir]}; ocamllex #{file}l"]
@@ -488,7 +489,7 @@ class OcamlBuildable
         src = "#{o[:base_dir]}/#{file}y"
         once file do
           # ocamlyacc creates .mli and a .ml file
-          Rumake::Tasks::File.new ({
+          Rumake::Tasks::File.new({
             :files => ["#{o[:base_dir]}/#{file}", "#{o[:base_dir]}/#{file}i" ],
             :prereqs => ["#{o[:base_dir]}/#{file}y"],
             :shell_commands => ["cd #{o[:base_dir]}; ocamlyacc #{file}y"]
@@ -509,7 +510,7 @@ class OcamlBuildable
         ml_deps = (o[:files_sorted] && file_o[:ml_deps]).map {|v| File.join(o[:base_dir], cc.ml_mod_ext(v) ) }
         cmd = "cd #{o[:base_dir]}; #{cc.cc_compile({:cppo_executable_fun => cppo_executable_fun,:out => file_o[:out_rel], :depends_on => depends_on, :in => file}, annot, o, file_o)}"
 
-        Rumake::Tasks::File.new ({
+        Rumake::Tasks::File.new({
           :files => [file_o[:out_absolute]],
           :prereqs => cppo_dep + [file_o[:absolute_path]] + ml_deps + depends_on,
           :shell_commands => [cmd]
@@ -521,7 +522,7 @@ class OcamlBuildable
           cmd = "cd #{o[:base_dir]}; #{cc.cc_compile({:cppo_executable_fun => cppo_executable_fun, :out => file_o[:out_rel], :depends_on => depends_on, :in => file}, o, file_o)}"
 
 
-          Rumake::Tasks::File.new ({
+          Rumake::Tasks::File.new({
             :files => file_o[:out_absolute],
             :prereqs => cppo_dep + [File.join("./", file_o[:absolute_path])] + ml_deps + depends_on,
             :shell_commands => [cmd]
@@ -530,7 +531,7 @@ class OcamlBuildable
       when /\.c$/
         once file_o[:out_absolute] do
           cmd = "cd #{o[:base_dir]}; ocamlc #{file_o.fetch(:CFLAGS, []).join(' ')} #{file}"
-          Rumake::Tasks::File.new ({
+          Rumake::Tasks::File.new({
             :files => file_o[:out_absolute].gsub(/\.c$/, '.o'),
             :prereqs => [file_o[:absolute_path]] + o[:depends_on],
             :shell_commands => [cmd]
@@ -597,7 +598,7 @@ class OcamlBuildable
 
     cmd = "cd #{o[:base_dir]}; #{cc.cc_link(opts, o)}"
 
-    Rumake::Tasks::File.new ({
+    Rumake::Tasks::File.new({
       :files => out_absolute,
       :aliases => @o.fetch(:alias_for_main_task, []),
       :prereqs => target_depends_on + o[:files].map {|k,v| v[:out_absolute]},
@@ -691,7 +692,7 @@ class Repository
 
     # compile etc
     @extra_targets.each {|v|
-      Rumake::Tasks::File.new ({
+      Rumake::Tasks::File.new({
         :files => v[:files],
         :prereqs =>  v[:depends_on_targets],
         :shell_commands => [*v[:cmd]]
@@ -784,7 +785,7 @@ $libs_to_clean_tasks = Set.new
 $libs_to_clean = Set.new
 
 %w{trace Camlp4Tracer instr}.each {|v|
-  Rumake::Tasks::File.new ({
+  Rumake::Tasks::File.new({
     :files => "trace/#{v}.cmo",
     :prereqs => ["trace/#{v}.ml"],
     :shell_commands => [ "cd trace; ocamlc -dtypes -pp 'camlp4r -I +camlp4 -parser Camlp4QuotationCommon  -parser Camlp4QuotationExpander' -I +camlp4 -o #{v}.cma -c #{v}.ml" ]
@@ -995,7 +996,7 @@ libs[:ttflib].o[:depends_on] += [libs[:swflib], libs[:extlib]]
     :compiler => compiler,
     :depends_on => l(:extc) + [haxe_checkout, OcamlLinkFlags.new(
       "unix.#{compiler.lib_ext}",
-      "str.#{compiler.lib_ext}",
+      "str.#{compiler.lib_ext}"
     )]
   }).tasks
 
@@ -1058,7 +1059,7 @@ Rumake::Tasks::File.new({
       # mind the space, this does not drop rules at ^
       makefile = makefile.gsub(" #{file}.cmx", " $(if ${BACKEND_#{k}}, #{file}.cmx,)")
       makefile = makefile.gsub(" #{file}.cmo", " $(if ${BACKEND_#{k}}, #{file}.cmo,)")
-      makefile = makefdile.gsub(Dir.pwd, '.')
+      makefile = makefile.gsub(Dir.pwd, '${CURDIR}')
     }
   }
 
