@@ -1468,7 +1468,7 @@ module Abstract = struct
 		let ef = mk (TField (ethis,(FStatic (c,cf)))) (map cf.cf_type) p in
 		make_call ctx ef args (map t) p
 
-	let rec check_cast ctx tleft eright p =
+	let rec do_check_cast ctx tleft eright p =
 		let tright = follow eright.etype in
 		let tleft = follow tleft in
 		if tleft == tright then eright else
@@ -1502,7 +1502,7 @@ module Abstract = struct
 				begin match find_to a pl t2 with
 					| tcf,None ->
 						let tcf = apply_params a.a_types pl tcf in
-						if type_iseq tcf tleft then eright else check_cast ctx tcf eright p
+						if type_iseq tcf tleft then eright else do_check_cast ctx tcf eright p
 					| _,Some cf ->
 						recurse cf (fun () -> make_static_call ctx c cf a pl [eright] tleft p)
 				end
@@ -1510,7 +1510,7 @@ module Abstract = struct
 				begin match find_from a pl t1 t2 with
 					| tcf,None ->
 						let tcf = apply_params a.a_types pl tcf in
-						if type_iseq tcf tleft then eright else check_cast ctx tcf eright p
+						if type_iseq tcf tleft then eright else do_check_cast ctx tcf eright p
 					| _,Some cf ->
 						recurse cf (fun () -> make_static_call ctx c cf a pl [eright] tleft p)
 				end
@@ -1518,6 +1518,9 @@ module Abstract = struct
 				eright)
 		with Not_found ->
 			eright
+
+	let check_cast ctx tleft eright p =
+		if ctx.com.display then eright else do_check_cast ctx tleft eright p
 
 	let handle_abstract_casts ctx e =
 		let rec loop ctx e = match e.eexpr with
@@ -1542,7 +1545,6 @@ module Abstract = struct
 					{e with etype = m}
 				end
 			| TCall(e1, el) ->
-				let e1 = loop ctx e1 in
 				begin try
 					begin match e1.eexpr with
 						| TField(e2,fa) ->
@@ -1636,6 +1638,8 @@ module PatternMatchConversion = struct
 		| DTGuard(e,dt1,dt2) ->
 			let ethen = convert_dt cctx dt1 in
 			mk (TIf(e,ethen,match dt2 with None -> None | Some dt -> Some (convert_dt cctx dt))) ethen.etype (punion e.epos ethen.epos)
+		| DTSwitch({eexpr = TMeta((Meta.Exhaustive,_,_),_)},[_,dt],None) ->
+			convert_dt cctx dt
 		| DTSwitch(e_st,cl,dto) ->
 			let def = match dto with None -> None | Some dt -> Some (convert_dt cctx dt) in
 			let cases = group_cases cl in
