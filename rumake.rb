@@ -480,7 +480,7 @@ class OcamlBuildable
         once file do
           Rumake::Tasks::File.new({
             :files => ["#{o[:base_dir]}/#{file}"],
-            :prereqs => ["#{o[:base_dir]}/#{file}l"],
+            :prereqs => ["#{o[:base_dir]}/#{file}l"] + o[:depends_on].main_targets,
             :shell_commands => ["cd #{o[:base_dir]}; ocamllex #{file}l"]
           })
         end
@@ -491,7 +491,7 @@ class OcamlBuildable
           # ocamlyacc creates .mli and a .ml file
           Rumake::Tasks::File.new({
             :files => ["#{o[:base_dir]}/#{file}", "#{o[:base_dir]}/#{file}i" ],
-            :prereqs => ["#{o[:base_dir]}/#{file}y"],
+            :prereqs => ["#{o[:base_dir]}/#{file}y"] + o[:depends_on].main_targets,
             :shell_commands => ["cd #{o[:base_dir]}; ocamlyacc #{file}y"]
           })
         end
@@ -499,9 +499,9 @@ class OcamlBuildable
 
       once src do
         # eg make main.ml depend on .git checkout
-        Rumake::Task.new({
-          :aliases => src,
-          :prereqs => o[:depends_on].main_targets
+        Rumake::Tasks::File.new({
+          :files => src,
+          :prereqs => o[:depends_on].main_targets,
         })
       end
 
