@@ -533,13 +533,18 @@ let rec unify_call_params ctx ?(overloads=None) cf el args r p inline =
 		| ({ eexpr = TConst TNull },true) :: l -> no_opt l
 		| l -> l
 	in
-	let rec default_value t =
+	let rec default_value t po =
 		if is_pos_infos t then
 			let infos = mk_infos ctx p [] in
 			let e = type_expr ctx infos (WithType t) in
 			(e, true)
-		else
+		else begin
+			if not ctx.com.config.pf_can_skip_non_nullable_argument then begin match po with
+				| Some (name,p) when not (is_nullable t) -> display_error ctx ("Cannot skip non-nullable argument " ^ name) p
+				| _ -> ()
+			end;
 			(null (ctx.t.tnull t) p, true)
+		end
 	in
 	let rec loop acc l l2 skip =
 		match l , l2 with
@@ -558,9 +563,9 @@ let rec unify_call_params ctx ?(overloads=None) cf el args r p inline =
 			else
 				List.map fst args, tf
 		| [] , (_,false,_) :: _ ->
-			error (List.fold_left (fun acc (_,_,t) -> default_value t :: acc) acc l2) "Not enough"
+			error (List.fold_left (fun acc (_,_,t) -> default_value t None :: acc) acc l2) "Not enough"
 		| [] , (name,true,t) :: l ->
-			loop (default_value t :: acc) [] l skip
+			loop (default_value t None :: acc) [] l skip
 		| _ , [] ->
 			(match List.rev skip with
 			| [] -> error acc "Too many"
@@ -574,7 +579,7 @@ let rec unify_call_params ctx ?(overloads=None) cf el args r p inline =
 			with
 				WithTypeError (ul,p) ->
 					if opt then
-						loop (default_value t :: acc) (ee :: l) l2 ((name,ul) :: skip)
+						loop (default_value t (Some (name,p)) :: acc) (ee :: l) l2 ((name,ul) :: skip)
 					else
 						arg_error ul name false p
 	in
@@ -1275,8 +1280,8 @@ let type_bind ctx (e : texpr) params p =
 					ordered_args
 			in
 			loop args [] given_args missing_args a
-		| (n,o,t) :: _ , (EConst(Ident "_"),p) :: _ when ctx.com.platform = Flash && o && not (is_nullable t) ->
-			error "Usage of _ is currently not supported for optional non-nullable arguments on flash9" p
+		| (n,o,t) :: _ , (EConst(Ident "_"),p) :: _ when not ctx.com.config.pf_can_skip_non_nullable_argument && o && not (is_nullable t) ->
+			error "Usage of _ is not supported for optional non-nullable arguments" p
 		| (n,o,t) :: args , ([] as params)
 		| (n,o,t) :: args , (EConst(Ident "_"),_) :: params ->
 			let v = alloc_var (alloc_name n) (if o then ctx.t.tnull t else t) in
@@ -1786,8 +1791,8 @@ let rec type_binop ctx op e1 e2 is_assign_op p =
 			let f,r,assign,commutative = find_overload a pl c e1.etype false in
 			begin match f.cf_expr with
 				| None ->
-					let e1 = match follow e1.etype with TAbstract(a,pl) -> {e1 with etype = apply_params a.a_types pl a.a_this} | _ -> e1 in
 					let e1,e2 = if commutative then e2,e1 else e1,e2 in
+					let e1 = match follow e1.etype with TAbstract(a,pl) -> {e1 with etype = apply_params a.a_types pl a.a_this} | _ -> e1 in
 					cast_rec e1 {e2 with etype = apply_params a.a_types pl a.a_this} r
 				| Some _ ->
 					let e1,e2 = if commutative then e2,e1 else e1,e2 in
@@ -2609,7 +2614,7 @@ and type_expr ctx (e,p) (with_type:with_type) =
 				wrap (Codegen.PatternMatchConversion.to_typed_ast ctx dt p)
 		with Exit ->
 			type_switch_old ctx e1 cases def with_type p
-		end	
+		end
 	| EReturn e ->
 		let e , t = (match e with
 			| None ->
@@ -2671,10 +2676,10 @@ and type_expr ctx (e,p) (with_type:with_type) =
 			let restore = fun () ->
 				ctx.m.module_types <- List.tl ctx.m.module_types;
 				ctx.on_error <- old;
-			in	
+			in
 			ctx.on_error <- (fun ctx msg ep ->
 				raise Not_found;
-			);			
+			);
 			begin try
 				let e = type_call ctx e el with_type p in
 				restore();
@@ -3043,7 +3048,7 @@ and type_call ctx e el (with_type:with_type) p =
 	let def () = (match e with
 		| EField ((EConst (Ident "super"),_),_) , _ -> ctx.in_super_call <- true
 		| _ -> ());
-		build_call ctx (type_access ctx (fst e) (snd e) MCall) el with_type p
+		build_call ctx e (type_access ctx (fst e) (snd e) MCall) el with_type p
 	in
 	match e, el with
 	| (EConst (Ident "trace"),p) , e :: el ->
@@ -3063,7 +3068,7 @@ and type_call ctx e el (with_type:with_type) p =
 		let ecb = try Some (type_ident_raise ctx "callback" p1 MCall) with Not_found -> None in
 		(match ecb with
 		| Some ecb ->
-			build_call ctx ecb args with_type p
+			build_call ctx e ecb args with_type p
 		| None ->
 			display_error ctx "callback syntax has changed to func.bind(args)" p;
 			let e = type_expr ctx e Value in
@@ -3102,7 +3107,7 @@ and type_call ctx e el (with_type:with_type) p =
 	| _ ->
 		def ()
 
-and build_call ctx acc el (with_type:with_type) p =
+and build_call ctx e acc el (with_type:with_type) p =
 	let fopts t f = match follow t with
 		| (TInst (c,pl) as t) -> Some (t,f)
 		| (TAnon a) as t -> (match !(a.a_status) with Statics c -> Some (TInst(c,[]),f) | _ -> Some (t,f))
@@ -3125,7 +3130,8 @@ and build_call ctx acc el (with_type:with_type) p =
 		begin match ef.cf_kind with
 		| Method MethMacro ->
 			let ethis = type_module_type ctx (TClassDecl cl) None p in
-			build_call ctx (AKMacro (ethis,ef)) (Interp.make_ast eparam :: el) with_type p
+			let e = match fst e with EField(e1,_) -> e1 | _ -> e in
+			build_call ctx e (AKMacro (ethis,ef)) (e :: el) with_type p
 		| _ ->
 			let t = follow (field_type ctx cl [] ef p) in
 			(* for abstracts we have to apply their parameters to the static function *)
@@ -3142,7 +3148,7 @@ and build_call ctx acc el (with_type:with_type) p =
 					| _ -> assert false
 					end
 				| _ -> assert false
-			in		
+			in
 			make_call ctx et (eparam :: params) r p
 		end
 	| AKMacro (ethis,f) ->
@@ -3750,6 +3756,10 @@ let load_macro ctx cpath f p =
 	let t = macro_timer ctx "typing (+init)" in
 	let api, mctx = get_macro_context ctx p in
 	let mint = Interp.get_ctx() in
+	let cpath, sub = (match List.rev (fst cpath) with
+		| name :: pack when name.[0] >= 'A' && name.[0] <= 'Z' -> (List.rev pack,name), Some (snd cpath)
+		| _ -> cpath, None
+	) in
 	let m = (try Hashtbl.find ctx.g.types_module cpath with Not_found -> cpath) in
 	let mloaded = Typeload.load_module mctx m p in
 	mctx.m <- {
@@ -3760,7 +3770,7 @@ let load_macro ctx cpath f p =
 		wildcard_packages = [];
 	};
 	add_dependency ctx.m.curmod mloaded;
-	let cl, meth = (match Typeload.load_instance mctx { tpackage = fst cpath; tname = snd cpath; tparams = []; tsub = None } p true with
+	let cl, meth = (match Typeload.load_instance mctx { tpackage = fst cpath; tname = snd cpath; tparams = []; tsub = sub } p true with
 		| TInst (c,_) ->
 			finalize mctx;
 			c, (try PMap.find f c.cl_statics with Not_found -> error ("Method " ^ f ^ " not found on class " ^ s_type_path cpath) p)
@@ -3772,7 +3782,7 @@ let load_macro ctx cpath f p =
 	let call args =
 		let t = macro_timer ctx (s_type_path cpath ^ "." ^ f) in
 		incr stats.s_macros_called;
-		let r = Interp.call_path (Interp.get_ctx()) ((fst cpath) @ [snd cpath]) f args api in
+		let r = Interp.call_path (Interp.get_ctx()) ((fst cpath) @ [(match sub with None -> snd cpath | Some s -> s)]) f args api in
 		t();
 		r
 	in

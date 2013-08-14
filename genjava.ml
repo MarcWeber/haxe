@@ -858,7 +858,8 @@ let configure gen =
   in
 
   let is_dynamic t = match real_type t with
-    | TMono _ | TDynamic _ -> true
+    | TMono _ | TDynamic _
+    | TInst({ cl_kind = KTypeParameter _ }, _) -> true
     | TAnon anon ->
       (match !(anon.a_status) with
         | EnumStatics _ | Statics _ | AbstractStatics _ -> false
@@ -1171,7 +1172,15 @@ let configure gen =
           write w "synchronized(";
           expr_s w eobj;
           write w ")";
-          expr_s w (mk_block eblock)
+          (match eblock.eexpr with
+          | TBlock(_ :: _) ->
+            expr_s w eblock
+          | _ ->
+            begin_block w;
+            expr_s w eblock;
+            if has_semicolon eblock then write w ";";
+            end_block w;
+          )
         | TCall ({ eexpr = TLocal( { v_name = "__goto__" } ) }, [ { eexpr = TConst(TInt v) } ] ) ->
           print w "break label%ld" v
         | TCall ({ eexpr = TLocal( { v_name = "__label__" } ) }, [ { eexpr = TConst(TInt v) } ] ) ->
@@ -1238,6 +1247,8 @@ let configure gen =
             acc + 1
           ) 0 el);
           write w ")"
+        | TNew ({ cl_kind = KTypeParameter _ } as cl, params, el) ->
+          print w "null /* This code should never be reached. It was produced by the use of @:generic on a new type parameter instance: %s */" (path_param_s e.epos (TClassDecl cl) cl.cl_path params)
         | TNew (cl, params, el) ->
           write w "new ";
           write w (path_param_s e.epos (TClassDecl cl) cl.cl_path params);
@@ -1774,7 +1785,7 @@ let configure gen =
   StubClosureImpl.configure gen (StubClosureImpl.default_implementation gen float_cl 10 (fun e _ _ -> e));*)
 
   FixOverrides.configure gen;
-  NormalizeType.configure gen;
+  Normalize.configure gen ~metas:(Hashtbl.create 0);
   AbstractImplementationFix.configure gen;
 
   IteratorsInterface.configure gen (fun e -> e);
